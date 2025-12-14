@@ -1,0 +1,242 @@
+# Backstage Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config
+  namespace: backstage
+data:
+  app-config.yaml: |
+    app:
+      title: CI/CD Integration Server - Backstage
+      baseUrl: http://localhost:7007
+
+    organization:
+      name: CI/CD Team
+
+    backend:
+      baseUrl: http://localhost:7007
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: http://localhost:7007
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+      database:
+        client: pg
+        connection:
+          host: postgres
+          port: 5432
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: backstage
+
+    integrations:
+      gitea:
+        - host: gitea.local
+          baseUrl: http://gitea.local:3001
+          username: ${GITEA_USERNAME}
+          password: ${GITEA_PASSWORD}
+
+    catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+      rules:
+        - allow: [Component, System, API, Resource, Location, Group, User, Template]
+      locations:
+        # Local CI/CD project components
+        - type: file
+          target: /app/catalog/cicd-catalog.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Location]
+
+    techdocs:
+      builder: 'local'
+      generator:
+        runIn: 'local'
+      publisher:
+        type: 'local'
+
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+
+    scaffolder:
+      defaultAuthor:
+        name: CI/CD Team
+        email: cicd@local
+
+    kubernetes:
+      serviceLocatorMethod:
+        type: 'multiTenant'
+      clusterLocatorMethods:
+        - type: 'config'
+          clusters:
+            - url: https://kubernetes.default.svc
+              name: backstage-cluster
+              authProvider: 'serviceAccount'
+              skipTLSVerify: true
+              skipMetricsLookup: true
+
+  cicd-catalog.yaml: |
+    apiVersion: backstage.io/v1alpha1
+    kind: System
+    metadata:
+      name: cicd-integration-server
+      title: CI/CD Integration Server
+      description: 輕量級本地開發環境，採用 Gitea + Kind + ArgoCD 架構
+      annotations:
+        backstage.io/techdocs-ref: dir:.
+      tags:
+        - kubernetes
+        - gitops
+        - cicd
+    spec:
+      owner: cicd-team
+      domain: infrastructure
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: gitea
+      title: Gitea Git Server
+      description: 輕量級 Git 服務，內建 CI/CD (Gitea Actions)
+      annotations:
+        backstage.io/techdocs-ref: dir:.
+      links:
+        - url: http://gitea.local:3001
+          title: Gitea Web UI
+          icon: web
+      tags:
+        - git
+        - scm
+    spec:
+      type: service
+      lifecycle: production
+      owner: cicd-team
+      system: cicd-integration-server
+      providesApis: []
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: argocd
+      title: ArgoCD GitOps CD
+      description: Kubernetes 原生的 GitOps 持續部署工具
+      annotations:
+        backstage.io/techdocs-ref: dir:.
+      links:
+        - url: https://localhost:8443
+          title: ArgoCD Web UI
+          icon: web
+      tags:
+        - gitops
+        - cd
+        - kubernetes
+    spec:
+      type: service
+      lifecycle: production
+      owner: cicd-team
+      system: cicd-integration-server
+      dependsOn:
+        - component:gitea
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: docker-registry
+      title: Docker Registry
+      description: 本地 Docker Registry 用於儲存和分發 Docker images
+      annotations:
+        backstage.io/techdocs-ref: dir:.
+      links:
+        - url: http://localhost:8081
+          title: Registry UI
+          icon: web
+      tags:
+        - docker
+        - registry
+        - container
+    spec:
+      type: service
+      lifecycle: production
+      owner: cicd-team
+      system: cicd-integration-server
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: kind-clusters
+      title: Kind Kubernetes Clusters
+      description: 使用 Kind 運行的本地 Kubernetes Clusters (ArgoCD, Git, App, Backstage)
+      tags:
+        - kubernetes
+        - kind
+        - cluster
+    spec:
+      type: resource
+      lifecycle: production
+      owner: cicd-team
+      system: cicd-integration-server
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Resource
+    metadata:
+      name: argocd-cluster
+      title: ArgoCD Cluster
+      description: 運行 ArgoCD 的 Kind Cluster (Port 8443)
+      tags:
+        - kubernetes
+    spec:
+      type: kubernetes-cluster
+      owner: cicd-team
+      system: cicd-integration-server
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Resource
+    metadata:
+      name: app-cluster
+      title: Applications Cluster
+      description: 運行應用程式和 Registry 的 Kind Cluster
+      tags:
+        - kubernetes
+    spec:
+      type: kubernetes-cluster
+      owner: cicd-team
+      system: cicd-integration-server
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Resource
+    metadata:
+      name: backstage-cluster
+      title: Backstage Cluster
+      description: 運行 Backstage Developer Portal 的 Kind Cluster (Port 7007)
+      tags:
+        - kubernetes
+        - backstage
+    spec:
+      type: kubernetes-cluster
+      owner: cicd-team
+      system: cicd-integration-server
+
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Group
+    metadata:
+      name: cicd-team
+      title: CI/CD Team
+      description: 負責 CI/CD 基礎設施的團隊
+    spec:
+      type: team
+      children: []

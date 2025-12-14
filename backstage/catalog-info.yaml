@@ -1,0 +1,238 @@
+# CI/CD Integration Server - Backstage Catalog
+# 此文件定義了本專案的所有組件和服務
+
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: cicd-integration-server
+  title: CI/CD Integration Server
+  description: |
+    輕量級本地開發環境，採用 Gitea + Kind + ArgoCD 架構。
+    完整的 CI/CD 整合環境，大幅降低資源需求。
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - kubernetes
+    - gitops
+    - cicd
+    - local-development
+  links:
+    - url: https://github.com
+      title: Project Repository
+      icon: github
+spec:
+  owner: cicd-team
+  domain: infrastructure
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gitea-server
+  title: Gitea Git Server
+  description: |
+    輕量級 Git 服務，功能類似 GitHub/GitLab。
+    記憶體需求極低 (約 500MB)，內建 CI/CD (Gitea Actions)。
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  links:
+    - url: http://gitea.local:3001
+      title: Gitea Web UI
+      icon: web
+    - url: ssh://gitea.local:2223
+      title: Git SSH
+      icon: git
+  tags:
+    - git
+    - scm
+    - gitea
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  providesApis: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gitea-runner
+  title: Gitea Actions Runner
+  description: |
+    Gitea CI/CD 執行器，語法與 GitHub Actions 相容。
+    使用 catthehacker/ubuntu:act 映像運行工作流程。
+  tags:
+    - ci
+    - runner
+    - gitea-actions
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  dependsOn:
+    - component:gitea-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: argocd-server
+  title: ArgoCD GitOps CD
+  description: |
+    Kubernetes 原生的 GitOps 持續部署工具。
+    監控 Git Repository 變更，自動同步到 Kubernetes。
+  links:
+    - url: https://localhost:8443
+      title: ArgoCD Web UI
+      icon: web
+  tags:
+    - gitops
+    - cd
+    - kubernetes
+    - argocd
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  dependsOn:
+    - component:gitea-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: docker-registry
+  title: Docker Registry
+  description: |
+    本地 Docker Registry 用於儲存和分發 Docker images。
+    不需要網路即可拉取 images，加速 CI/CD 流程。
+  links:
+    - url: http://localhost:5000
+      title: Registry API
+      icon: docker
+    - url: http://localhost:8081
+      title: Registry UI
+      icon: web
+  tags:
+    - docker
+    - registry
+    - container
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage-portal
+  title: Backstage Developer Portal
+  description: |
+    開發者入口平台，集中管理所有 CI/CD 組件。
+    提供統一的服務目錄和文件入口。
+  links:
+    - url: http://localhost:7007
+      title: Backstage Web UI
+      icon: web
+  tags:
+    - backstage
+    - developer-portal
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: argocd-cluster
+  title: ArgoCD Kind Cluster
+  description: |
+    運行 ArgoCD 的 Kind Kubernetes Cluster。
+    Port: 8443 (HTTPS)
+  tags:
+    - kubernetes
+    - kind
+spec:
+  type: kubernetes-cluster
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: git-cluster
+  title: Git Kind Cluster
+  description: |
+    保留供未來擴展的 Kind Kubernetes Cluster。
+  tags:
+    - kubernetes
+    - kind
+spec:
+  type: kubernetes-cluster
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: app-cluster
+  title: Applications Kind Cluster
+  description: |
+    運行應用程式和 Registry 的 Kind Kubernetes Cluster。
+    Port: 5000 (Registry), 8081 (Registry UI)
+  tags:
+    - kubernetes
+    - kind
+spec:
+  type: kubernetes-cluster
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: backstage-cluster
+  title: Backstage Kind Cluster
+  description: |
+    運行 Backstage Developer Portal 的 Kind Kubernetes Cluster。
+    Port: 7007 (Web UI)
+  tags:
+    - kubernetes
+    - kind
+    - backstage
+spec:
+  type: kubernetes-cluster
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: cicd-team
+  title: CI/CD Team
+  description: 負責 CI/CD 基礎設施的團隊
+spec:
+  type: team
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: admin
+  title: Administrator
+spec:
+  memberOf:
+    - cicd-team

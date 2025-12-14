@@ -1,0 +1,89 @@
+# Backstage Helm Values for CI/CD Integration
+backstage:
+  image:
+    registry: ghcr.io
+    repository: backstage/backstage
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  containerPorts:
+    backend: 7007
+
+  extraEnvVars:
+    - name: APP_CONFIG_app_baseUrl
+      value: "http://localhost:7007"
+    - name: APP_CONFIG_backend_baseUrl
+      value: "http://localhost:7007"
+    - name: APP_CONFIG_backend_listen_port
+      value: "7007"
+    - name: APP_CONFIG_app_title
+      value: "CI/CD Integration Server - Backstage"
+    - name: APP_CONFIG_organization_name
+      value: "CI/CD Team"
+
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+
+  appConfig:
+    app:
+      title: CI/CD Integration Server - Backstage
+      baseUrl: http://localhost:7007
+
+    organization:
+      name: CI/CD Team
+
+    backend:
+      baseUrl: http://localhost:7007
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: http://localhost:7007
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+
+    catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+      rules:
+        - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
+      locations:
+        - type: url
+          target: https://raw.githubusercontent.com/backstage/backstage/master/packages/catalog-model/examples/all-components.yaml
+          rules:
+            - allow: [Component]
+
+service:
+  type: NodePort
+  ports:
+    backend: 7007
+    targetPort: backend
+  nodePorts:
+    backend: 30007
+
+postgresql:
+  enabled: true
+  auth:
+    username: backstage
+    password: backstage123
+    database: backstage
+  primary:
+    persistence:
+      enabled: true
+      size: 2Gi
+
+ingress:
+  enabled: false

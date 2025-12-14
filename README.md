@@ -1,6 +1,6 @@
 # CI/CD Integration Server - 輕量級本地開發環境
 
-> 完整的 CI/CD 整合環境，採用 Gitea + Kind + ArgoCD 架構，大幅降低資源需求
+> 完整的 CI/CD 整合環境，採用 Gitea + Kind + ArgoCD + Backstage 架構，大幅降低資源需求
 
 ---
 
@@ -14,6 +14,7 @@
 - [快速安裝](#快速安裝)
 - [目錄結構](#目錄結構)
 - [服務訪問](#服務訪問)
+- [Backstage 開發者入口](#backstage-開發者入口)
 - [進階設定](#進階設定)
 - [維護指南](#維護指南)
 - [故障排除](#故障排除)
@@ -37,10 +38,11 @@
 
 ### 主要特色
 
-- **三個獨立 Kind Clusters**：ArgoCD、Git、Applications 分離部署
+- **四個獨立 Kind Clusters**：ArgoCD、Git、Applications、Backstage 分離部署
 - **Gitea + Actions**：輕量級 Git 服務，相容 GitHub Actions 語法
 - **ArgoCD GitOps**：自動化持續部署
 - **本地 Docker Registry**：私有 Image 倉庫
+- **Backstage Developer Portal**：統一的開發者入口平台
 - **Oracle XE 整合**：支援整合測試環境
 
 ---
@@ -50,37 +52,37 @@
 ### 整體架構圖
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      Host Machine (建議 64GB RAM)                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                    Kind Kubernetes Clusters                       │  │
-│  │                                                                   │  │
-│  │  ┌────────────────┐  ┌────────────────┐  ┌────────────────────┐  │  │
-│  │  │ ArgoCD Cluster │  │  Git Cluster   │  │    App Cluster     │  │  │
-│  │  │                │  │                │  │                    │  │  │
-│  │  │  - ArgoCD      │  │  - (保留)       │  │  - Registry        │  │  │
-│  │  │  - GitOps CD   │  │                │  │  - Registry UI     │  │  │
-│  │  │                │  │                │  │  - Applications    │  │  │
-│  │  │  Port: 8443    │  │                │  │  - Oracle XE       │  │  │
-│  │  └────────────────┘  └────────────────┘  └────────────────────┘  │  │
-│  │                                                                   │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-│                                                                         │
-│  ┌────────────────┐    ┌────────────────┐                              │
-│  │     Gitea      │    │  Gitea Runner  │                              │
-│  │   (Docker)     │    │   (Docker)     │                              │
-│  │                │    │                │                              │
-│  │  - Git Repos   │◄──►│  - CI/CD Jobs  │                              │
-│  │  - Web UI      │    │  - Actions     │                              │
-│  │  - Actions CI  │    │                │                              │
-│  │                │    │                │                              │
-│  │  Port: 3001    │    │                │                              │
-│  │  SSH:  2223    │    │                │                              │
-│  └────────────────┘    └────────────────┘                              │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       Host Machine (建議 64GB RAM)                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                      Kind Kubernetes Clusters                          │  │
+│  │                                                                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │  │
+│  │  │ArgoCD Cluster│  │ Git Cluster  │  │ App Cluster  │  │ Backstage  │  │  │
+│  │  │              │  │              │  │              │  │  Cluster   │  │  │
+│  │  │  - ArgoCD    │  │  - (保留)     │  │  - Registry  │  │            │  │  │
+│  │  │  - GitOps CD │  │              │  │  - Apps      │  │ - Backstage│  │  │
+│  │  │              │  │              │  │  - Oracle XE │  │ - PostgreSQL│ │  │
+│  │  │  Port: 8443  │  │              │  │  Port: 5000  │  │  Port: 7007│  │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘  │  │
+│  │                                                                        │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌────────────────┐    ┌────────────────┐                                    │
+│  │     Gitea      │    │  Gitea Runner  │                                    │
+│  │   (Docker)     │    │   (Docker)     │                                    │
+│  │                │    │                │                                    │
+│  │  - Git Repos   │◄──►│  - CI/CD Jobs  │                                    │
+│  │  - Web UI      │    │  - Actions     │                                    │
+│  │  - Actions CI  │    │                │                                    │
+│  │                │    │                │                                    │
+│  │  Port: 3001    │    │                │                                    │
+│  │  SSH:  2223    │    │                │                                    │
+│  └────────────────┘    └────────────────┘                                    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### CI/CD 流程
@@ -122,10 +124,11 @@ ArgoCD 偵測變更
 - 支援多節點配置
 - 資源消耗比完整 K8s 低
 
-**本專案使用三個獨立 Cluster：**
+**本專案使用四個獨立 Cluster：**
 - `argocd-cluster`：運行 ArgoCD
 - `git-cluster`：保留供未來擴展
 - `app-cluster`：運行應用程式和 Registry
+- `backstage-cluster`：運行 Backstage 開發者入口平台
 
 ### 2. Gitea
 
@@ -397,9 +400,10 @@ cicd/
 │   └── setup-docker-permissions.sh  # Docker 權限設定
 │
 ├── Kind 配置
-│   ├── kind-argocd-cluster.yaml # ArgoCD Cluster 配置
-│   ├── kind-git-cluster.yaml    # Git Cluster 配置
-│   └── kind-app-cluster.yaml    # App Cluster 配置
+│   ├── kind-argocd-cluster.yaml    # ArgoCD Cluster 配置
+│   ├── kind-git-cluster.yaml       # Git Cluster 配置
+│   ├── kind-app-cluster.yaml       # App Cluster 配置
+│   └── kind-backstage-cluster.yaml # Backstage Cluster 配置
 │
 ├── gitea/                       # Gitea 配置
 │   └── docker-compose.yaml      # Gitea Docker Compose
@@ -418,6 +422,12 @@ cicd/
 ├── argocd/                      # ArgoCD 配置
 │   ├── application-example.yaml # Application 範例
 │   └── README.md                # ArgoCD 使用指南
+│
+├── backstage/                   # Backstage 開發者入口
+│   ├── README.md                # Backstage 設定指南
+│   ├── helm-values.yaml         # Helm 安裝配置
+│   ├── catalog-info.yaml        # 服務目錄定義
+│   └── *.yaml                   # Kubernetes 部署配置
 │
 ├── workflows/                   # Gitea Actions Workflow 範例
 │   ├── ci-example.yaml          # CI Pipeline 範例
@@ -443,6 +453,7 @@ cicd/
 | Registry API | http://localhost:5000 | Docker Registry |
 | Registry UI | http://localhost:8081 | Registry Web 介面 |
 | ArgoCD | https://localhost:8443 | 需先 port-forward |
+| Backstage | http://localhost:7007 | 開發者入口平台 |
 
 ### 訪問 ArgoCD
 
@@ -469,6 +480,63 @@ echo
    - 資料庫選擇 SQLite3
    - 設定管理員帳號密碼
 3. 建立 Organization 和 Repositories
+
+---
+
+## Backstage 開發者入口
+
+### 簡介
+
+[Backstage](https://backstage.io/) 是由 Spotify 開發的開源開發者入口平台。本專案已整合 Backstage，提供統一的服務目錄和文件入口。
+
+### 部署 Backstage
+
+```bash
+# 1. 創建 Backstage Cluster (如尚未創建)
+kind create cluster --config kind-backstage-cluster.yaml
+
+# 2. 切換到 Backstage cluster context
+./kubectl config use-context kind-backstage-cluster
+
+# 3. 使用 Helm 安裝 Backstage
+./helm repo add backstage https://backstage.github.io/charts
+./helm repo update
+./helm install backstage backstage/backstage -n backstage --create-namespace \
+  -f backstage/helm-values.yaml
+
+# 4. 等待 Backstage 就緒
+./kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=backstage -n backstage --timeout=180s
+```
+
+### 訪問 Backstage
+
+部署完成後，直接訪問：http://localhost:7007
+
+### 功能特色
+
+| 功能 | 說明 |
+|------|------|
+| 服務目錄 | 集中管理所有 CI/CD 組件 |
+| TechDocs | 整合技術文件 |
+| 軟體模板 | 快速建立新專案 |
+| Kubernetes 整合 | 查看各 Cluster 狀態 |
+
+### 目錄結構
+
+```
+backstage/
+├── README.md                    # Backstage 詳細指南
+├── helm-values.yaml             # Helm 安裝配置
+├── catalog-info.yaml            # 服務目錄定義
+├── postgres-secrets.yaml        # 資料庫認證 (備用)
+├── postgres-pvc.yaml            # 持久化儲存 (備用)
+├── postgres-deployment.yaml     # PostgreSQL 部署 (備用)
+├── backstage-secrets.yaml       # Backstage 認證 (備用)
+├── backstage-configmap.yaml     # 應用配置 (備用)
+└── backstage-deployment.yaml    # 部署配置 (備用)
+```
+
+詳細說明請參考 [backstage/README.md](backstage/README.md)
 
 ---
 
@@ -702,6 +770,7 @@ docker-compose up -d
 | Gitea | https://docs.gitea.io/ |
 | Gitea Actions | https://docs.gitea.io/en-us/actions-overview/ |
 | ArgoCD | https://argo-cd.readthedocs.io/ |
+| Backstage | https://backstage.io/docs |
 | GitOps 原則 | https://opengitops.dev/ |
 
 ### 本專案文件
@@ -711,6 +780,7 @@ docker-compose up -d
 | [tasks-gitea.md](tasks-gitea.md) | 詳細部署任務清單 |
 | [gitea-runner/README.md](gitea-runner/README.md) | Runner 設定指南 |
 | [argocd/README.md](argocd/README.md) | ArgoCD 使用指南 |
+| [backstage/README.md](backstage/README.md) | Backstage 設定指南 |
 | [SUMMARY.md](SUMMARY.md) | 專案完整總結 |
 
 ### 延伸學習
@@ -732,6 +802,8 @@ docker-compose up -d
 | Gitea | 1.21+ | Git 服務 |
 | act_runner | 0.2.6+ | CI Runner |
 | ArgoCD | 2.9+ | GitOps CD |
+| Backstage | latest | 開發者入口平台 |
+| Helm | 3.x+ | Kubernetes 套件管理 |
 | Oracle XE | 21.3.0 | 測試資料庫 |
 
 ---
@@ -744,4 +816,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.0
+**版本**：v1.1 (新增 Backstage 整合)
