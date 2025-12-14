@@ -1,0 +1,62 @@
+# ArgoCD Application 範例
+# 用於自動同步 GitOps repository 到 Kubernetes cluster
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-application
+  namespace: argocd
+  # Finalizers 確保刪除 Application 時也會刪除相關資源
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project 設定
+  project: default
+
+  # Source: GitOps Repository
+  source:
+    # Gitea repository URL
+    # 需要先在 ArgoCD 中配置 repository 認證
+    repoURL: http://gitea.local:3000/your-org/gitops-manifests.git
+    targetRevision: HEAD
+    path: overlays/dev  # Kustomize overlay 路徑
+
+  # Destination: 目標 Kubernetes Cluster
+  destination:
+    # 使用當前 cluster (in-cluster)
+    server: https://kubernetes.default.svc
+    namespace: app-dev
+
+  # Sync Policy: 自動同步設定
+  syncPolicy:
+    automated:
+      # 自動 prune 已刪除的資源
+      prune: true
+      # 自動修復 drift（偏移）
+      selfHeal: true
+      # 允許空的資源
+      allowEmpty: false
+
+    syncOptions:
+      # 如果 namespace 不存在則自動創建
+      - CreateNamespace=true
+      # 驗證 schema
+      - Validate=true
+      # PruneLast: 最後才刪除資源
+      - PruneLast=true
+
+    # Retry 策略
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略差異設定（可選）
+  ignoreDifferences:
+    # 忽略某些欄位的差異（例如動態產生的值）
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # 忽略 replicas 的差異（如果使用 HPA）
