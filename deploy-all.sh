@@ -114,8 +114,84 @@ echo -e "${BLUE}   kubectl port-forward svc/argocd-server -n argocd 8443:443${NC
 echo -e "${GREEN}   訪問: https://localhost:8443${NC}"
 echo ""
 
-# 步驟 5: 下載 Oracle Image
-echo -e "${BLUE}[步驟 5]${NC} 準備 Oracle Image..."
+# 步驟 5: 部署 Backstage
+echo -e "${BLUE}[步驟 5]${NC} 部署 Backstage Developer Portal..."
+kubectl config use-context kind-backstage-cluster
+
+# 檢查 Helm 是否存在
+if [ ! -f "./helm" ]; then
+    echo "下載 Helm..."
+    curl -fsSL -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.19.4-linux-amd64.tar.gz
+    tar -zxvf /tmp/helm.tar.gz -C /tmp
+    cp /tmp/linux-amd64/helm ./helm
+    chmod +x ./helm
+fi
+
+# 添加 Backstage Helm repo
+./helm repo add backstage https://backstage.github.io/charts 2>/dev/null || true
+./helm repo update
+
+# 創建 backstage namespace
+kubectl create namespace backstage --dry-run=client -o yaml | kubectl apply -f -
+
+# 部署 Backstage
+if ./helm list -n backstage | grep -q backstage; then
+    echo -e "${YELLOW}⚠️  Backstage 已部署，跳過安裝${NC}"
+else
+    ./helm install backstage backstage/backstage -n backstage -f backstage/helm-values.yaml --timeout 10m
+fi
+
+# 應用額外配置 (允許從 GitHub 讀取 catalog)
+kubectl apply -f backstage/app-config-override.yaml
+
+# 更新 deployment 以掛載配置
+kubectl patch deployment backstage -n backstage --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes",
+    "value": [
+      {
+        "name": "app-config-override",
+        "configMap": {
+          "name": "backstage-app-config"
+        }
+      }
+    ]
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/volumeMounts",
+    "value": [
+      {
+        "name": "app-config-override",
+        "mountPath": "/app/app-config.production.yaml",
+        "subPath": "app-config.production.yaml"
+      }
+    ]
+  },
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/0/command",
+    "value": ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]
+  }
+]' 2>/dev/null || true
+
+# 設定 Guest 認證環境變數
+kubectl set env deployment/backstage -n backstage \
+  NODE_ENV=development \
+  APP_CONFIG_auth_environment=development \
+  APP_CONFIG_auth_providers_guest_dangerouslyAllowOutsideDevelopment=true 2>/dev/null || true
+
+echo "等待 Backstage pods 啟動..."
+kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=backstage -n backstage --timeout=300s || true
+kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=postgresql -n backstage --timeout=180s || true
+
+echo -e "${GREEN}✅ Backstage 部署完成${NC}"
+echo -e "${GREEN}   訪問: http://localhost:7007${NC}"
+echo ""
+
+# 步驟 6: 下載 Oracle Image
+echo -e "${BLUE}[步驟 6]${NC} 準備 Oracle Image..."
 if docker images | grep -q "gvenzl/oracle-xe"; then
     echo -e "${YELLOW}⚠️  Oracle image 已存在${NC}"
 else
@@ -146,16 +222,19 @@ echo -e "${BLUE}已部署的服務:${NC}"
 echo -e "  ✓ ArgoCD Cluster (kind-argocd-cluster)"
 echo -e "  ✓ Git Cluster (kind-git-cluster)"
 echo -e "  ✓ App Cluster (kind-app-cluster)"
+echo -e "  ✓ Backstage Cluster (kind-backstage-cluster)"
 echo -e "  ✓ Gitea - http://gitea.local:3000"
 echo -e "  ✓ Docker Registry - http://localhost:5000"
 echo -e "  ✓ Registry UI - http://localhost:8081"
 echo -e "  ✓ ArgoCD - https://localhost:8443 (需要 port-forward)"
+echo -e "  ✓ Backstage - http://localhost:7007"
 echo ""
 echo -e "${YELLOW}下一步:${NC}"
 echo -e "  1. 訪問 http://gitea.local:3000 完成 Gitea 初始設定"
 echo -e "  2. 在 Gitea 創建 Organization 和 Repositories"
 echo -e "  3. 設定 Gitea Actions Runner (參考 gitea-runner/README.md)"
 echo -e "  4. 配置 ArgoCD 連接到 Gitea repositories"
+echo -e "  5. 訪問 http://localhost:7007 使用 Backstage 開發者入口"
 echo ""
 echo -e "${BLUE}檢查狀態:${NC}"
 echo -e "  kubectl get pods -A                    # 查看所有 pods"

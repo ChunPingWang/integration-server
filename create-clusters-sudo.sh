@@ -1,5 +1,5 @@
 #!/bin/bash
-# 使用 sudo 創建三個 Kind Clusters 的腳本
+# 使用 sudo 創建四個 Kind Clusters 的腳本
 # 注意：這是臨時方案，建議完成 docker group 設置後使用 create-clusters.sh
 
 set -e
@@ -18,7 +18,7 @@ echo "✅ Docker 連接正常"
 echo ""
 
 # 創建 ArgoCD Cluster
-echo "📦 [1/3] 創建 ArgoCD Cluster..."
+echo "📦 [1/4] 創建 ArgoCD Cluster..."
 if sudo kind get clusters 2>/dev/null | grep -q "^argocd-cluster$"; then
     echo "⚠️  ArgoCD cluster 已存在，跳過創建"
 else
@@ -28,7 +28,7 @@ fi
 echo ""
 
 # 創建 Git Cluster
-echo "📦 [2/3] 創建 Git (Gitea) Cluster..."
+echo "📦 [2/4] 創建 Git (Gitea) Cluster..."
 if sudo kind get clusters 2>/dev/null | grep -q "^git-cluster$"; then
     echo "⚠️  Git cluster 已存在，跳過創建"
 else
@@ -38,12 +38,22 @@ fi
 echo ""
 
 # 創建 App Cluster
-echo "📦 [3/3] 創建 Applications Cluster..."
+echo "📦 [3/4] 創建 Applications Cluster..."
 if sudo kind get clusters 2>/dev/null | grep -q "^app-cluster$"; then
     echo "⚠️  App cluster 已存在，跳過創建"
 else
     sudo kind create cluster --config kind-app-cluster.yaml
     echo "✅ Applications cluster 創建完成"
+fi
+echo ""
+
+# 創建 Backstage Cluster
+echo "📦 [4/4] 創建 Backstage Cluster..."
+if sudo kind get clusters 2>/dev/null | grep -q "^backstage-cluster$"; then
+    echo "⚠️  Backstage cluster 已存在，跳過創建"
+else
+    sudo kind create cluster --config kind-backstage-cluster.yaml
+    echo "✅ Backstage cluster 創建完成"
 fi
 echo ""
 
@@ -69,6 +79,9 @@ kubectl cluster-info --context kind-git-cluster
 echo ""
 echo "--- App Cluster ---"
 kubectl cluster-info --context kind-app-cluster
+echo ""
+echo "--- Backstage Cluster ---"
+kubectl cluster-info --context kind-backstage-cluster
 echo ""
 
 echo "✅ 所有 clusters 已就緒！"
