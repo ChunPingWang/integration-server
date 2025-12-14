@@ -1,14 +1,47 @@
 # CI/CD Integration Server - Backstage Catalog
-# 此文件定義了本專案的所有組件和服務
+# 此文件定義了本專案的所有組件、服務和資源
+# 最後更新：2025-12-14
 
+# ============================================
+# Domain - 領域定義
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: cicd-infrastructure
+  title: CI/CD Infrastructure
+  description: |
+    CI/CD 基礎設施領域，包含所有 DevOps 相關的服務和資源。
+spec:
+  owner: cicd-team
+
+---
+# ============================================
+# System - 系統定義
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: System
 metadata:
   name: cicd-integration-server
   title: CI/CD Integration Server
   description: |
-    輕量級本地開發環境，採用 Gitea + Kind + ArgoCD 架構。
-    完整的 CI/CD 整合環境，大幅降低資源需求。
+    ## 系統概述
+    輕量級本地開發環境，採用 Gitea + Kind + ArgoCD + Backstage 架構。
+
+    ## 核心功能
+    - **Git 版本控制**: Gitea 提供輕量級 Git 服務
+    - **CI/CD Pipeline**: Gitea Actions 執行持續整合
+    - **GitOps 部署**: ArgoCD 自動化部署到 Kubernetes
+    - **Container Registry**: 本地 Docker Registry 儲存映像
+    - **開發者入口**: Backstage 統一管理所有服務
+
+    ## 快速訪問
+    | 服務 | URL |
+    |------|-----|
+    | Gitea | http://gitea.local:3001 |
+    | Backstage | http://localhost:7007 |
+    | Registry UI | http://localhost:8081 |
+    | ArgoCD | https://localhost:8443 (需 port-forward) |
   annotations:
     backstage.io/techdocs-ref: dir:.
   tags:
@@ -17,41 +50,66 @@ metadata:
     - cicd
     - local-development
   links:
-    - url: https://github.com
-      title: Project Repository
+    - url: https://github.com/ChunPingWang/integration-server
+      title: GitHub Repository
       icon: github
 spec:
   owner: cicd-team
-  domain: infrastructure
+  domain: cicd-infrastructure
 
 ---
+# ============================================
+# Components - Git 服務
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: gitea-server
   title: Gitea Git Server
   description: |
+    ## 服務說明
     輕量級 Git 服務，功能類似 GitHub/GitLab。
-    記憶體需求極低 (約 500MB)，內建 CI/CD (Gitea Actions)。
+
+    ## 存取資訊
+    - **Web UI**: http://gitea.local:3001
+    - **SSH Clone**: ssh://git@gitea.local:2223
+    - **預設帳號**: admin / Admin@123
+
+    ## 功能特色
+    - 記憶體需求極低 (約 500MB)
+    - 內建 CI/CD (Gitea Actions，相容 GitHub Actions)
+    - 支援 Container Registry
+    - 快速啟動 (秒級)
+
+    ## 健康檢查
+    ```bash
+    curl http://gitea.local:3001/api/v1/version
+    ```
   annotations:
     backstage.io/techdocs-ref: dir:.
+    backstage.io/source-location: url:https://github.com/ChunPingWang/integration-server/tree/main/gitea
   links:
     - url: http://gitea.local:3001
       title: Gitea Web UI
       icon: web
-    - url: ssh://gitea.local:2223
-      title: Git SSH
-      icon: git
+    - url: http://gitea.local:3001/admin
+      title: Gitea Admin
+      icon: dashboard
+    - url: http://gitea.local:3001/api/swagger
+      title: Gitea API Docs
+      icon: docs
   tags:
     - git
     - scm
     - gitea
+    - docker
 spec:
   type: service
   lifecycle: production
   owner: cicd-team
   system: cicd-integration-server
-  providesApis: []
+  providesApis:
+    - gitea-api
 
 ---
 apiVersion: backstage.io/v1alpha1
@@ -60,12 +118,40 @@ metadata:
   name: gitea-runner
   title: Gitea Actions Runner
   description: |
+    ## 服務說明
     Gitea CI/CD 執行器，語法與 GitHub Actions 相容。
-    使用 catthehacker/ubuntu:act 映像運行工作流程。
+
+    ## 配置資訊
+    - **容器名稱**: gitea-runner
+    - **映像**: gitea/act_runner:latest
+    - **執行映像**: catthehacker/ubuntu:act-latest
+
+    ## 查看狀態
+    ```bash
+    docker ps | grep gitea-runner
+    docker logs gitea-runner
+    ```
+
+    ## Runner Labels
+    - ubuntu-latest
+    - ubuntu-22.04
+
+    ## 註冊新 Runner
+    1. 登入 Gitea → Site Administration → Actions → Runners
+    2. 點擊 Create new Runner
+    3. 複製 Registration Token
+    4. 更新 gitea-runner/.env
+  annotations:
+    backstage.io/source-location: url:https://github.com/ChunPingWang/integration-server/tree/main/gitea-runner
+  links:
+    - url: http://gitea.local:3001/admin/actions/runners
+      title: Runner 管理介面
+      icon: dashboard
   tags:
     - ci
     - runner
     - gitea-actions
+    - docker
 spec:
   type: service
   lifecycle: production
@@ -75,18 +161,62 @@ spec:
     - component:gitea-server
 
 ---
+# ============================================
+# Components - GitOps CD
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: argocd-server
   title: ArgoCD GitOps CD
   description: |
+    ## 服務說明
     Kubernetes 原生的 GitOps 持續部署工具。
-    監控 Git Repository 變更，自動同步到 Kubernetes。
+
+    ## 存取資訊
+    - **Web UI**: https://localhost:8443 (需先執行 port-forward)
+    - **帳號**: admin
+    - **密碼**: 執行以下命令取得
+
+    ## 啟動 Port Forward
+    ```bash
+    ./kubectl config use-context kind-argocd-cluster
+    ./kubectl port-forward svc/argocd-server -n argocd 8443:443
+    ```
+
+    ## 取得密碼
+    ```bash
+    ./kubectl -n argocd get secret argocd-initial-admin-secret \
+      -o jsonpath="{.data.password}" | base64 -d && echo
+    ```
+
+    ## 功能特色
+    - 監控 Git Repository 變更
+    - 自動同步到 Kubernetes
+    - 支援回滾和差異比對
+    - 提供視覺化管理介面
+
+    ## 運行位置
+    - Cluster: kind-argocd-cluster
+    - Namespace: argocd
+  annotations:
+    backstage.io/kubernetes-id: argocd-server
+    backstage.io/kubernetes-namespace: argocd
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=argocd-server
+    backstage.io/source-location: url:https://github.com/ChunPingWang/integration-server/tree/main/argocd
   links:
     - url: https://localhost:8443
       title: ArgoCD Web UI
       icon: web
+    - url: https://localhost:8443/settings/repos
+      title: Repository 設定
+      icon: github
+    - url: https://localhost:8443/applications
+      title: Applications
+      icon: dashboard
+    - url: https://argo-cd.readthedocs.io/
+      title: ArgoCD 官方文件
+      icon: docs
   tags:
     - gitops
     - cd
@@ -99,18 +229,52 @@ spec:
   system: cicd-integration-server
   dependsOn:
     - component:gitea-server
+    - resource:argocd-cluster
 
 ---
+# ============================================
+# Components - Container Registry
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: docker-registry
   title: Docker Registry
   description: |
+    ## 服務說明
     本地 Docker Registry 用於儲存和分發 Docker images。
-    不需要網路即可拉取 images，加速 CI/CD 流程。
+
+    ## 存取資訊
+    - **Registry API**: http://localhost:5000
+    - **Registry UI**: http://localhost:8081
+    - **認證**: 無 (開放存取)
+
+    ## 常用命令
+    ```bash
+    # 查看所有映像
+    curl http://localhost:5000/v2/_catalog
+
+    # 查看特定映像標籤
+    curl http://localhost:5000/v2/<image-name>/tags/list
+
+    # 推送映像
+    docker tag myimage:latest localhost:5000/myimage:latest
+    docker push localhost:5000/myimage:latest
+    ```
+
+    ## 已儲存的映像
+    - oracle-xe:21-slim (測試資料庫)
+
+    ## 運行位置
+    - Cluster: kind-app-cluster
+    - Namespace: registry
+  annotations:
+    backstage.io/kubernetes-id: docker-registry
+    backstage.io/kubernetes-namespace: registry
+    backstage.io/kubernetes-label-selector: app=docker-registry
+    backstage.io/source-location: url:https://github.com/ChunPingWang/integration-server/tree/main/registry
   links:
-    - url: http://localhost:5000
+    - url: http://localhost:5000/v2/_catalog
       title: Registry API
       icon: docker
     - url: http://localhost:8081
@@ -120,46 +284,121 @@ metadata:
     - docker
     - registry
     - container
+    - kubernetes
 spec:
   type: service
   lifecycle: production
   owner: cicd-team
   system: cicd-integration-server
+  dependsOn:
+    - resource:app-cluster
+  providesApis:
+    - registry-api
 
 ---
+# ============================================
+# Components - Developer Portal
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: backstage-portal
   title: Backstage Developer Portal
   description: |
+    ## 服務說明
     開發者入口平台，集中管理所有 CI/CD 組件。
-    提供統一的服務目錄和文件入口。
+
+    ## 存取資訊
+    - **Web UI**: http://localhost:7007
+    - **認證模式**: Guest (開發環境)
+    - **登入方式**: 點擊 "Enter" 按鈕
+
+    ## 功能特色
+    - 服務目錄：集中管理所有 CI/CD 組件
+    - TechDocs：整合技術文件
+    - 軟體模板：快速建立新專案
+    - Kubernetes 整合：查看各 Cluster 狀態
+
+    ## 運行位置
+    - Cluster: kind-backstage-cluster
+    - Namespace: backstage
+    - PostgreSQL: backstage-postgresql
+
+    ## 健康檢查
+    ```bash
+    curl http://localhost:7007/api/catalog/entities
+    ```
+  annotations:
+    backstage.io/kubernetes-id: backstage
+    backstage.io/kubernetes-namespace: backstage
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=backstage
+    backstage.io/source-location: url:https://github.com/ChunPingWang/integration-server/tree/main/backstage
   links:
     - url: http://localhost:7007
       title: Backstage Web UI
       icon: web
+    - url: http://localhost:7007/catalog
+      title: Service Catalog
+      icon: dashboard
+    - url: http://localhost:7007/api-docs
+      title: API Documentation
+      icon: docs
+    - url: https://backstage.io/docs
+      title: Backstage 官方文件
+      icon: docs
   tags:
     - backstage
     - developer-portal
+    - kubernetes
 spec:
-  type: service
+  type: website
   lifecycle: production
   owner: cicd-team
   system: cicd-integration-server
+  dependsOn:
+    - resource:backstage-cluster
 
 ---
+# ============================================
+# Resources - Kubernetes Clusters
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
   name: argocd-cluster
   title: ArgoCD Kind Cluster
   description: |
+    ## Cluster 資訊
     運行 ArgoCD 的 Kind Kubernetes Cluster。
-    Port: 8443 (HTTPS)
+
+    ## 連線資訊
+    - **Context**: kind-argocd-cluster
+    - **HTTP Port**: 8080
+    - **HTTPS Port**: 8443
+
+    ## 切換 Context
+    ```bash
+    ./kubectl config use-context kind-argocd-cluster
+    ```
+
+    ## 查看狀態
+    ```bash
+    ./kubectl get pods -n argocd
+    ./kubectl get nodes
+    ```
+
+    ## 部署的服務
+    - ArgoCD (namespace: argocd)
+  annotations:
+    backstage.io/kubernetes-cluster: kind-argocd-cluster
+  links:
+    - url: https://kind.sigs.k8s.io/
+      title: Kind Documentation
+      icon: docs
   tags:
     - kubernetes
     - kind
+    - argocd
 spec:
   type: kubernetes-cluster
   owner: cicd-team
@@ -172,10 +411,25 @@ metadata:
   name: git-cluster
   title: Git Kind Cluster
   description: |
+    ## Cluster 資訊
     保留供未來擴展的 Kind Kubernetes Cluster。
+
+    ## 連線資訊
+    - **Context**: kind-git-cluster
+
+    ## 切換 Context
+    ```bash
+    ./kubectl config use-context kind-git-cluster
+    ```
+
+    ## 用途
+    可用於部署 Gitea 或其他 Git 相關服務到 Kubernetes。
+  annotations:
+    backstage.io/kubernetes-cluster: kind-git-cluster
   tags:
     - kubernetes
     - kind
+    - reserved
 spec:
   type: kubernetes-cluster
   owner: cicd-team
@@ -188,11 +442,40 @@ metadata:
   name: app-cluster
   title: Applications Kind Cluster
   description: |
+    ## Cluster 資訊
     運行應用程式和 Registry 的 Kind Kubernetes Cluster。
-    Port: 5000 (Registry), 8081 (Registry UI)
+
+    ## 連線資訊
+    - **Context**: kind-app-cluster
+    - **Registry Port**: 5000
+    - **Registry UI Port**: 8081
+
+    ## 切換 Context
+    ```bash
+    ./kubectl config use-context kind-app-cluster
+    ```
+
+    ## 查看狀態
+    ```bash
+    ./kubectl get pods -n registry
+    ./kubectl get pods -n default
+    ```
+
+    ## 部署的服務
+    - Docker Registry (namespace: registry)
+    - Registry UI (namespace: registry)
+    - 應用程式 (由 ArgoCD 部署)
+  annotations:
+    backstage.io/kubernetes-cluster: kind-app-cluster
+  links:
+    - url: http://localhost:5000/v2/_catalog
+      title: Registry API
+      icon: docker
   tags:
     - kubernetes
     - kind
+    - applications
+    - registry
 spec:
   type: kubernetes-cluster
   owner: cicd-team
@@ -205,8 +488,32 @@ metadata:
   name: backstage-cluster
   title: Backstage Kind Cluster
   description: |
+    ## Cluster 資訊
     運行 Backstage Developer Portal 的 Kind Kubernetes Cluster。
-    Port: 7007 (Web UI)
+
+    ## 連線資訊
+    - **Context**: kind-backstage-cluster
+    - **Web UI Port**: 7007
+
+    ## 切換 Context
+    ```bash
+    ./kubectl config use-context kind-backstage-cluster
+    ```
+
+    ## 查看狀態
+    ```bash
+    ./kubectl get pods -n backstage
+    ```
+
+    ## 部署的服務
+    - Backstage (namespace: backstage)
+    - PostgreSQL (namespace: backstage)
+  annotations:
+    backstage.io/kubernetes-cluster: kind-backstage-cluster
+  links:
+    - url: http://localhost:7007
+      title: Backstage Web UI
+      icon: web
   tags:
     - kubernetes
     - kind
@@ -217,12 +524,197 @@ spec:
   system: cicd-integration-server
 
 ---
+# ============================================
+# Resources - Databases
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: backstage-postgresql
+  title: Backstage PostgreSQL
+  description: |
+    ## 資料庫資訊
+    Backstage 使用的 PostgreSQL 資料庫。
+
+    ## 連線資訊
+    - **Host**: backstage-postgresql (內部)
+    - **Port**: 5432
+    - **Database**: backstage
+    - **Username**: backstage
+    - **Password**: backstage123
+
+    ## 連線測試
+    ```bash
+    ./kubectl config use-context kind-backstage-cluster
+    ./kubectl exec -n backstage backstage-postgresql-0 -- \
+      psql -U backstage -c '\l'
+    ```
+  tags:
+    - database
+    - postgresql
+    - backstage
+spec:
+  type: database
+  owner: cicd-team
+  system: cicd-integration-server
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: oracle-xe-image
+  title: Oracle XE Database Image
+  description: |
+    ## 映像資訊
+    Oracle XE 21c 資料庫映像，用於整合測試。
+
+    ## 映像位置
+    - **Registry**: localhost:5000/oracle-xe:21-slim
+    - **來源**: gvenzl/oracle-xe:21-slim
+
+    ## 使用方式
+    在 Gitea Actions workflow 中使用：
+    ```yaml
+    services:
+      oracle:
+        image: localhost:5000/oracle-xe:21-slim
+        env:
+          ORACLE_PASSWORD: test123
+        ports:
+          - 1521:1521
+    ```
+
+    ## 預設連線
+    - **Port**: 1521
+    - **SID**: XE
+    - **User**: system
+    - **Password**: (部署時設定)
+  tags:
+    - database
+    - oracle
+    - docker-image
+    - testing
+spec:
+  type: docker-image
+  owner: cicd-team
+  system: cicd-integration-server
+  dependsOn:
+    - component:docker-registry
+
+---
+# ============================================
+# APIs
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: gitea-api
+  title: Gitea REST API
+  description: |
+    Gitea REST API 提供程式化存取 Git 服務功能。
+
+    ## API 文件
+    http://gitea.local:3001/api/swagger
+
+    ## 認證方式
+    - Basic Auth
+    - Access Token
+  links:
+    - url: http://gitea.local:3001/api/swagger
+      title: Swagger UI
+      icon: docs
+  tags:
+    - rest
+    - git
+spec:
+  type: openapi
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Gitea API
+      version: "1.0"
+    servers:
+      - url: http://gitea.local:3001/api/v1
+    paths:
+      /version:
+        get:
+          summary: Get Gitea version
+          responses:
+            '200':
+              description: Version info
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: registry-api
+  title: Docker Registry API
+  description: |
+    Docker Registry HTTP API V2。
+
+    ## 常用 Endpoints
+    - GET /v2/_catalog - 列出所有映像
+    - GET /v2/{name}/tags/list - 列出映像標籤
+    - GET /v2/{name}/manifests/{reference} - 取得映像清單
+  links:
+    - url: http://localhost:5000/v2/
+      title: Registry API Root
+      icon: docker
+  tags:
+    - rest
+    - docker
+spec:
+  type: openapi
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Docker Registry API
+      version: "2.0"
+    servers:
+      - url: http://localhost:5000/v2
+    paths:
+      /_catalog:
+        get:
+          summary: List repositories
+          responses:
+            '200':
+              description: Repository list
+      /{name}/tags/list:
+        get:
+          summary: List image tags
+          parameters:
+            - name: name
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            '200':
+              description: Tag list
+
+---
+# ============================================
+# Organization
+# ============================================
 apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
   name: cicd-team
   title: CI/CD Team
-  description: 負責 CI/CD 基礎設施的團隊
+  description: |
+    負責 CI/CD 基礎設施的團隊。
+
+    ## 職責
+    - 維護 Gitea、ArgoCD、Registry 等核心服務
+    - 管理 Kind Kubernetes Clusters
+    - 提供 CI/CD Pipeline 支援
+    - 維護 Backstage Developer Portal
 spec:
   type: team
   children: []
@@ -232,7 +724,29 @@ apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
   name: admin
-  title: Administrator
+  title: System Administrator
+  description: |
+    系統管理員帳號。
+
+    ## 權限
+    - Gitea 管理員
+    - ArgoCD 管理員
+    - 完整系統存取權限
 spec:
   memberOf:
     - cicd-team
+
+---
+# ============================================
+# Location - 用於自動發現其他 catalog 檔案
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: cicd-catalog
+  title: CI/CD Catalog Location
+  description: CI/CD Integration Server 的 Catalog 位置
+spec:
+  type: url
+  targets:
+    - https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml
