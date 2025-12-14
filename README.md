@@ -553,9 +553,296 @@ sudo ufw allow 5000/tcp  # Registry (NodePort)
 
 ### 簡介
 
-[Backstage](https://backstage.io/) 是由 Spotify 開發的開源開發者入口平台。本專案已整合 Backstage，提供統一的服務目錄和文件入口。
+[Backstage](https://backstage.io/) 是由 Spotify 開發的開源開發者入口平台。本專案已整合 Backstage，提供統一的服務目錄和文件入口，讓使用者可以在一個介面中查看所有 CI/CD 服務的狀態和資訊。
+
+### 訪問 Backstage
+
+部署完成後，直接訪問：**http://localhost:7007**
+
+- **認證模式**: Guest (開發環境)
+- **登入方式**: 點擊 "Enter" 按鈕直接進入
+
+### Backstage 架構
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Backstage Developer Portal              │
+│                  http://localhost:7007                   │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │  Catalog    │  │    APIs     │  │  TechDocs   │     │
+│  │  服務目錄    │  │  API 文件   │  │  技術文件    │     │
+│  └─────────────┘  └─────────────┘  └─────────────┘     │
+│                                                          │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │              catalog-info.yaml                     │  │
+│  │  (GitHub: integration-server/backstage/)          │  │
+│  │                                                    │  │
+│  │  定義: Domain, System, Components, APIs,          │  │
+│  │        Resources, Groups, Users                   │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                          │
+├─────────────────────────────────────────────────────────┤
+│  PostgreSQL │ backstage-postgresql:5432                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Service Catalog (服務目錄)
+
+Backstage 使用 **catalog-info.yaml** 定義所有服務和資源。目前的 Catalog 包含：
+
+| 類型 | 數量 | 說明 |
+|------|------|------|
+| Domain | 1 | CI/CD 基礎設施領域 |
+| System | 1 | CI/CD Integration Server 系統 |
+| Component | 5 | Gitea, Runner, ArgoCD, Registry, Backstage |
+| API | 2 | Gitea REST API, Docker Registry API |
+| Resource | 6 | 4 個 K8s Clusters + PostgreSQL + Oracle Image |
+| Group | 1 | CI/CD Team |
+| User | 1 | Admin |
+
+### Catalog 實體說明
+
+#### 1. Domain (領域)
+定義業務或技術領域，用於組織多個 Systems。
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: cicd-infrastructure
+  title: CI/CD Infrastructure
+spec:
+  owner: cicd-team
+```
+
+#### 2. System (系統)
+代表一組相關的 Components 和 Resources。
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: cicd-integration-server
+  title: CI/CD Integration Server
+spec:
+  owner: cicd-team
+  domain: cicd-infrastructure
+```
+
+#### 3. Component (組件)
+代表可部署的軟體單元，如服務、網站、函式庫等。
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gitea-server
+  title: Gitea Git Server
+  description: |
+    ## 服務說明
+    輕量級 Git 服務...
+  links:
+    - url: http://gitea.local:3001
+      title: Gitea Web UI
+      icon: web
+spec:
+  type: service          # service, website, library
+  lifecycle: production  # experimental, production, deprecated
+  owner: cicd-team
+  system: cicd-integration-server
+  providesApis:
+    - gitea-api
+```
+
+#### 4. API
+定義服務提供的 API 介面。
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: gitea-api
+  title: Gitea REST API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: cicd-team
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Gitea API
+      version: "1.0"
+```
+
+#### 5. Resource (資源)
+代表基礎設施資源，如資料庫、Kubernetes Clusters 等。
+
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: argocd-cluster
+  title: ArgoCD Kind Cluster
+spec:
+  type: kubernetes-cluster  # database, s3-bucket, kubernetes-cluster
+  owner: cicd-team
+  system: cicd-integration-server
+```
+
+### 配置檔案說明
+
+#### backstage/helm-values.yaml
+Helm 安裝的主要配置檔案，定義：
+- Backstage 映像和資源限制
+- 應用程式基礎 URL
+- 認證設定 (Guest 模式)
+- PostgreSQL 資料庫連線
+- Catalog 初始位置
+
+```yaml
+backstage:
+  appConfig:
+    app:
+      baseUrl: http://localhost:7007
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+    catalog:
+      locations:
+        - type: url
+          target: https://raw.githubusercontent.com/.../catalog-info.yaml
+```
+
+#### backstage/app-config-override.yaml
+Kubernetes ConfigMap，覆蓋預設配置：
+- 允許讀取 GitHub raw 檔案
+- Catalog 規則 (允許的實體類型)
+
+```yaml
+backend:
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
+      - host: github.com
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
+```
+
+#### backstage/catalog-info.yaml
+服務目錄定義檔，包含所有 CI/CD 服務的詳細資訊。每個服務包含：
+- 存取資訊 (URL、帳號密碼)
+- 操作指令 (kubectl 命令)
+- 健康檢查命令
+- 相關連結
+
+### 新增服務到 Catalog
+
+#### 方法 1: 編輯 catalog-info.yaml
+
+1. 編輯 `backstage/catalog-info.yaml`，新增 Component：
+
+```yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-new-service
+  title: My New Service
+  description: |
+    ## 服務說明
+    描述你的服務...
+
+    ## 存取資訊
+    - **URL**: http://localhost:8080
+  links:
+    - url: http://localhost:8080
+      title: Service URL
+      icon: web
+  tags:
+    - my-tag
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+```
+
+2. 提交並推送到 GitHub：
+
+```bash
+git add backstage/catalog-info.yaml
+git commit -m "新增: My New Service 到 Backstage Catalog"
+git push
+```
+
+3. Backstage 會自動抓取更新 (約 1-5 分鐘)
+
+#### 方法 2: 透過 Backstage UI 註冊
+
+1. 開啟 http://localhost:7007
+2. 點擊左側 **Create** 選單
+3. 選擇 **Register Existing Component**
+4. 輸入 catalog-info.yaml 的 URL
+5. 點擊 **Analyze** 然後 **Import**
+
+### 手動重新整理 Catalog
+
+如果需要立即更新 Catalog：
+
+```bash
+# 1. 取得認證 Token
+TOKEN=$(curl -s -X POST http://localhost:7007/api/auth/guest/refresh \
+  -H "Content-Type: application/json" | jq -r '.backstageIdentity.token')
+
+# 2. 刪除舊的 Location
+LOCATION_ID=$(curl -s http://localhost:7007/api/catalog/locations \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.[0].data.id')
+
+curl -X DELETE "http://localhost:7007/api/catalog/locations/$LOCATION_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. 重新註冊 Catalog Location
+curl -X POST http://localhost:7007/api/catalog/locations \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"url","target":"https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml"}'
+
+# 4. 等待處理完成 (約 10-30 秒)
+sleep 15
+
+# 5. 驗證實體數量
+curl -s http://localhost:7007/api/catalog/entities \
+  -H "Authorization: Bearer $TOKEN" | jq 'length'
+```
+
+### 查看 Catalog API
+
+```bash
+# 取得 Token
+TOKEN=$(curl -s -X POST http://localhost:7007/api/auth/guest/refresh \
+  -H "Content-Type: application/json" | jq -r '.backstageIdentity.token')
+
+# 列出所有實體
+curl -s http://localhost:7007/api/catalog/entities \
+  -H "Authorization: Bearer $TOKEN" | jq '.[].metadata.name'
+
+# 依類型篩選
+curl -s "http://localhost:7007/api/catalog/entities?filter=kind=Component" \
+  -H "Authorization: Bearer $TOKEN" | jq '.[].metadata.name'
+
+# 取得特定實體
+curl -s "http://localhost:7007/api/catalog/entities/by-name/component/default/gitea-server" \
+  -H "Authorization: Bearer $TOKEN" | jq '.metadata.title'
+```
 
 ### 部署 Backstage
+
+如果需要手動部署 Backstage：
 
 ```bash
 # 1. 創建 Backstage Cluster (如尚未創建)
@@ -570,22 +857,19 @@ kind create cluster --config kind-backstage-cluster.yaml
 ./helm install backstage backstage/backstage -n backstage --create-namespace \
   -f backstage/helm-values.yaml
 
-# 4. 等待 Backstage 就緒
-./kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=backstage -n backstage --timeout=180s
+# 4. 應用額外配置
+./kubectl apply -f backstage/app-config-override.yaml
+
+# 5. 設定 Guest 認證
+./kubectl set env deployment/backstage -n backstage \
+  NODE_ENV=development \
+  APP_CONFIG_auth_environment=development \
+  APP_CONFIG_auth_providers_guest_dangerouslyAllowOutsideDevelopment=true
+
+# 6. 等待 Backstage 就緒
+./kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=backstage \
+  -n backstage --timeout=180s
 ```
-
-### 訪問 Backstage
-
-部署完成後，直接訪問：http://localhost:7007
-
-### 功能特色
-
-| 功能 | 說明 |
-|------|------|
-| 服務目錄 | 集中管理所有 CI/CD 組件 |
-| TechDocs | 整合技術文件 |
-| 軟體模板 | 快速建立新專案 |
-| Kubernetes 整合 | 查看各 Cluster 狀態 |
 
 ### 目錄結構
 
@@ -593,13 +877,56 @@ kind create cluster --config kind-backstage-cluster.yaml
 backstage/
 ├── README.md                    # Backstage 詳細指南
 ├── helm-values.yaml             # Helm 安裝配置
-├── catalog-info.yaml            # 服務目錄定義
+├── catalog-info.yaml            # 服務目錄定義 (核心檔案)
+├── app-config-override.yaml     # 額外配置 ConfigMap
 ├── postgres-secrets.yaml        # 資料庫認證 (備用)
 ├── postgres-pvc.yaml            # 持久化儲存 (備用)
 ├── postgres-deployment.yaml     # PostgreSQL 部署 (備用)
 ├── backstage-secrets.yaml       # Backstage 認證 (備用)
 ├── backstage-configmap.yaml     # 應用配置 (備用)
 └── backstage-deployment.yaml    # 部署配置 (備用)
+```
+
+### Backstage 故障排除
+
+#### 無法登入 (Guest 認證失敗)
+
+```bash
+# 確認環境變數設定
+./kubectl get deployment backstage -n backstage -o yaml | grep -A5 env
+
+# 重新設定 Guest 認證
+./kubectl set env deployment/backstage -n backstage \
+  NODE_ENV=development \
+  APP_CONFIG_auth_environment=development \
+  APP_CONFIG_auth_providers_guest_dangerouslyAllowOutsideDevelopment=true
+```
+
+#### Catalog 無法載入
+
+```bash
+# 檢查 Backstage 日誌
+./kubectl logs -n backstage deployment/backstage --tail=50
+
+# 確認可以讀取 GitHub
+curl -s https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml | head -10
+```
+
+#### 實體未顯示
+
+```bash
+# 檢查 Catalog 位置
+TOKEN=$(curl -s -X POST http://localhost:7007/api/auth/guest/refresh \
+  -H "Content-Type: application/json" | jq -r '.backstageIdentity.token')
+
+curl -s http://localhost:7007/api/catalog/locations \
+  -H "Authorization: Bearer $TOKEN" | jq '.'
+
+# 如果沒有位置，重新註冊
+curl -X POST http://localhost:7007/api/catalog/locations \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"url","target":"https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml"}'
 ```
 
 詳細說明請參考 [backstage/README.md](backstage/README.md)
@@ -883,4 +1210,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.2 (新增 Ingress 遠端訪問設定)
+**版本**：v1.3 (增強 Backstage 配置說明)
