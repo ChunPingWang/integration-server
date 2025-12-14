@@ -429,6 +429,14 @@ cicd/
 │   ├── catalog-info.yaml        # 服務目錄定義
 │   └── *.yaml                   # Kubernetes 部署配置
 │
+├── ingress/                     # Ingress 設定 (遠端訪問)
+│   ├── README.md                # Ingress 設定指南
+│   ├── deploy-ingress-controller.sh  # 部署 Ingress Controller
+│   ├── apply-ingress-rules.sh   # 部署 Ingress 規則
+│   ├── argocd-ingress.yaml      # ArgoCD Ingress
+│   ├── backstage-ingress.yaml   # Backstage Ingress
+│   └── registry-ingress.yaml    # Registry Ingress
+│
 ├── workflows/                   # Gitea Actions Workflow 範例
 │   ├── ci-example.yaml          # CI Pipeline 範例
 │   └── integration-test-example.yaml  # 整合測試範例
@@ -480,6 +488,64 @@ echo
    - 資料庫選擇 SQLite3
    - 設定管理員帳號密碼
 3. 建立 Organization 和 Repositories
+
+---
+
+## 遠端訪問設定
+
+### 使用 Ingress Controller 遠端訪問
+
+若需從其他電腦訪問 CI/CD 服務，可以設定 Ingress Controller：
+
+```bash
+# 1. 部署 NGINX Ingress Controller
+./ingress/deploy-ingress-controller.sh
+
+# 2. 部署 Ingress 規則
+./ingress/apply-ingress-rules.sh
+```
+
+### 遠端機器配置
+
+在遠端機器的 `/etc/hosts` 加入 (將 `SERVER_IP` 替換為實際 IP)：
+
+```bash
+sudo bash -c 'cat >> /etc/hosts << EOF
+
+# CI/CD Integration Server
+SERVER_IP  argocd.local
+SERVER_IP  backstage.local
+SERVER_IP  registry.local
+SERVER_IP  registry-ui.local
+SERVER_IP  gitea.local
+EOF'
+```
+
+### 遠端訪問 URL
+
+| 服務 | URL | 端口 |
+|------|-----|------|
+| ArgoCD | https://argocd.local:8443 | 8443 |
+| Backstage | http://backstage.local:7080 | 7080 |
+| Registry | http://registry.local:8088 | 8088 |
+| Gitea | http://gitea.local:3001 | 3001 |
+
+### 防火牆設定
+
+確保以下端口可從遠端訪問：
+
+```bash
+# Ubuntu/Debian (使用 ufw)
+sudo ufw allow 3001/tcp  # Gitea
+sudo ufw allow 7007/tcp  # Backstage (NodePort)
+sudo ufw allow 7080/tcp  # Backstage (Ingress)
+sudo ufw allow 8080/tcp  # ArgoCD HTTP
+sudo ufw allow 8443/tcp  # ArgoCD HTTPS
+sudo ufw allow 8088/tcp  # Registry
+sudo ufw allow 5000/tcp  # Registry (NodePort)
+```
+
+詳細說明請參考 [ingress/README.md](ingress/README.md)
 
 ---
 
@@ -781,6 +847,7 @@ docker-compose up -d
 | [gitea-runner/README.md](gitea-runner/README.md) | Runner 設定指南 |
 | [argocd/README.md](argocd/README.md) | ArgoCD 使用指南 |
 | [backstage/README.md](backstage/README.md) | Backstage 設定指南 |
+| [ingress/README.md](ingress/README.md) | 遠端訪問設定指南 |
 | [SUMMARY.md](SUMMARY.md) | 專案完整總結 |
 
 ### 延伸學習
@@ -816,4 +883,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.1 (新增 Backstage 整合)
+**版本**：v1.2 (新增 Ingress 遠端訪問設定)
