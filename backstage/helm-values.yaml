@@ -39,27 +39,6 @@ backstage:
     app:
       title: CI/CD Integration Server - Backstage
       baseUrl: http://localhost:7007
-      branding:
-        theme:
-          light:
-            primaryColor: '#0062ff'
-            headerColor1: '#161616'
-            headerColor2: '#393939'
-          dark:
-            primaryColor: '#0062ff'
-            headerColor1: '#161616'
-            headerColor2: '#393939'
-        logo:
-          light:
-            src: https://www.ibm.com/design/language/877b208e9d05b37650a70e55867861bd/core_gray60_on_white.svg
-            width: 100
-            height: 40
-            alt: CI/CD Integration Server
-          dark:
-            src: https://www.ibm.com/design/language/877b208e9d05b37650a70e55867861bd/core_gray60_on_white.svg
-            width: 100
-            height: 40
-            alt: CI/CD Integration Server
 
     organization:
       name: CI/CD Team
@@ -70,7 +49,6 @@ backstage:
         port: 7007
       csp:
         connect-src: ["'self'", 'http:', 'https:']
-        img-src: ["'self'", 'data:', 'https://www.ibm.com']
       cors:
         origin: http://localhost:7007
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
