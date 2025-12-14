@@ -65,25 +65,25 @@ else
     echo "等待 Gitea 啟動..."
     sleep 10
     echo -e "${GREEN}✅ Gitea 部署完成${NC}"
-    echo -e "${GREEN}   訪問: http://gitea.local:3000${NC}"
+    echo -e "${GREEN}   訪問: http://gitea.local:3001${NC}"
 fi
 cd ..
 echo ""
 
 # 步驟 3: 部署 Docker Registry 到 App Cluster
 echo -e "${BLUE}[步驟 3]${NC} 部署 Docker Registry..."
-kubectl config use-context kind-app-cluster
+./kubectl config use-context kind-app-cluster
 
 # 創建 registry namespace
-kubectl create namespace registry --dry-run=client -o yaml | kubectl apply -f -
+./kubectl create namespace registry --dry-run=client -o yaml | ./kubectl apply -f -
 
 # 部署 registry
-kubectl apply -f registry/registry-pvc.yaml
-kubectl apply -f registry/registry-deployment.yaml
-kubectl apply -f registry/registry-ui-deployment.yaml
+./kubectl apply -f registry/registry-pvc.yaml
+./kubectl apply -f registry/registry-deployment.yaml
+./kubectl apply -f registry/registry-ui-deployment.yaml
 
 echo "等待 Registry pods 啟動..."
-kubectl wait --for=condition=Ready pods --all -n registry --timeout=180s || true
+./kubectl wait --for=condition=Ready pods --all -n registry --timeout=180s || true
 echo -e "${GREEN}✅ Registry 部署完成${NC}"
 echo -e "${GREEN}   Registry: http://localhost:5000${NC}"
 echo -e "${GREEN}   Registry UI: http://localhost:8081${NC}"
@@ -91,32 +91,32 @@ echo ""
 
 # 步驟 4: 部署 ArgoCD
 echo -e "${BLUE}[步驟 4]${NC} 部署 ArgoCD..."
-kubectl config use-context kind-argocd-cluster
+./kubectl config use-context kind-argocd-cluster
 
 # 創建 argocd namespace
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+./kubectl create namespace argocd --dry-run=client -o yaml | ./kubectl apply -f -
 
 # 部署 ArgoCD
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+./kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 echo "等待 ArgoCD pods 啟動..."
-kubectl wait --for=condition=Ready pods --all -n argocd --timeout=300s || true
+./kubectl wait --for=condition=Ready pods --all -n argocd --timeout=300s || true
 
 echo -e "${GREEN}✅ ArgoCD 部署完成${NC}"
 echo ""
 echo -e "${YELLOW}取得 ArgoCD 初始密碼:${NC}"
-ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "等待 secret 創建...")
+ARGOCD_PASSWORD=$(./kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "等待 secret 創建...")
 echo -e "${GREEN}   使用者名稱: admin${NC}"
 echo -e "${GREEN}   密碼: ${ARGOCD_PASSWORD}${NC}"
 echo ""
 echo -e "${YELLOW}啟動 ArgoCD Port Forward (在新終端執行):${NC}"
-echo -e "${BLUE}   kubectl port-forward svc/argocd-server -n argocd 8443:443${NC}"
+echo -e "${BLUE}   ./kubectl port-forward svc/argocd-server -n argocd 8443:443${NC}"
 echo -e "${GREEN}   訪問: https://localhost:8443${NC}"
 echo ""
 
 # 步驟 5: 部署 Backstage
 echo -e "${BLUE}[步驟 5]${NC} 部署 Backstage Developer Portal..."
-kubectl config use-context kind-backstage-cluster
+./kubectl config use-context kind-backstage-cluster
 
 # 檢查 Helm 是否存在
 if [ ! -f "./helm" ]; then
@@ -132,7 +132,7 @@ fi
 ./helm repo update
 
 # 創建 backstage namespace
-kubectl create namespace backstage --dry-run=client -o yaml | kubectl apply -f -
+./kubectl create namespace backstage --dry-run=client -o yaml | ./kubectl apply -f -
 
 # 部署 Backstage
 if ./helm list -n backstage | grep -q backstage; then
@@ -142,10 +142,10 @@ else
 fi
 
 # 應用額外配置 (允許從 GitHub 讀取 catalog)
-kubectl apply -f backstage/app-config-override.yaml
+./kubectl apply -f backstage/app-config-override.yaml
 
 # 更新 deployment 以掛載配置
-kubectl patch deployment backstage -n backstage --type='json' -p='[
+./kubectl patch deployment backstage -n backstage --type='json' -p='[
   {
     "op": "add",
     "path": "/spec/template/spec/volumes",
@@ -177,14 +177,14 @@ kubectl patch deployment backstage -n backstage --type='json' -p='[
 ]' 2>/dev/null || true
 
 # 設定 Guest 認證環境變數
-kubectl set env deployment/backstage -n backstage \
+./kubectl set env deployment/backstage -n backstage \
   NODE_ENV=development \
   APP_CONFIG_auth_environment=development \
   APP_CONFIG_auth_providers_guest_dangerouslyAllowOutsideDevelopment=true 2>/dev/null || true
 
 echo "等待 Backstage pods 啟動..."
-kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=backstage -n backstage --timeout=300s || true
-kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=postgresql -n backstage --timeout=180s || true
+./kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=backstage -n backstage --timeout=300s || true
+./kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=postgresql -n backstage --timeout=180s || true
 
 echo -e "${GREEN}✅ Backstage 部署完成${NC}"
 echo -e "${GREEN}   訪問: http://localhost:7007${NC}"
@@ -223,21 +223,21 @@ echo -e "  ✓ ArgoCD Cluster (kind-argocd-cluster)"
 echo -e "  ✓ Git Cluster (kind-git-cluster)"
 echo -e "  ✓ App Cluster (kind-app-cluster)"
 echo -e "  ✓ Backstage Cluster (kind-backstage-cluster)"
-echo -e "  ✓ Gitea - http://gitea.local:3000"
+echo -e "  ✓ Gitea - http://gitea.local:3001"
 echo -e "  ✓ Docker Registry - http://localhost:5000"
 echo -e "  ✓ Registry UI - http://localhost:8081"
 echo -e "  ✓ ArgoCD - https://localhost:8443 (需要 port-forward)"
 echo -e "  ✓ Backstage - http://localhost:7007"
 echo ""
 echo -e "${YELLOW}下一步:${NC}"
-echo -e "  1. 訪問 http://gitea.local:3000 完成 Gitea 初始設定"
+echo -e "  1. 訪問 http://gitea.local:3001 完成 Gitea 初始設定"
 echo -e "  2. 在 Gitea 創建 Organization 和 Repositories"
 echo -e "  3. 設定 Gitea Actions Runner (參考 gitea-runner/README.md)"
 echo -e "  4. 配置 ArgoCD 連接到 Gitea repositories"
 echo -e "  5. 訪問 http://localhost:7007 使用 Backstage 開發者入口"
 echo ""
 echo -e "${BLUE}檢查狀態:${NC}"
-echo -e "  kubectl get pods -A                    # 查看所有 pods"
+echo -e "  ./kubectl get pods -A                  # 查看所有 pods"
 echo -e "  kind get clusters                      # 列出所有 clusters"
 echo -e "  docker ps                              # 查看 Gitea 容器"
 echo ""

@@ -5,14 +5,14 @@
 ### 1. 啟動 Port Forward
 
 ```bash
-kubectl config use-context kind-argocd-cluster
-kubectl port-forward svc/argocd-server -n argocd 8443:443
+./kubectl config use-context kind-argocd-cluster
+./kubectl port-forward svc/argocd-server -n argocd 8443:443
 ```
 
 ### 2. 取得初始密碼
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+./kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 echo
 ```
 
@@ -33,7 +33,7 @@ echo
 1. 前往 **Settings** > **Repositories**
 2. 點擊 **Connect Repo**
 3. 填入以下資訊：
-   - Repository URL: `http://gitea.local:3000/your-org/gitops-manifests.git`
+   - Repository URL: `http://gitea.local:3001/your-org/gitops-manifests.git`
    - Username: (你的 Gitea 使用者名稱)
    - Password: (Gitea Access Token)
 4. 點擊 **Connect**
@@ -50,14 +50,14 @@ rm argocd
 argocd login localhost:8443 --username admin --password <your-password> --insecure
 
 # 新增 repository
-argocd repo add http://gitea.local:3000/your-org/gitops-manifests.git \
+argocd repo add http://gitea.local:3001/your-org/gitops-manifests.git \
   --username <gitea-username> \
   --password <gitea-access-token>
 ```
 
 ## 建立 Gitea Access Token
 
-1. 登入 Gitea (http://gitea.local:3000)
+1. 登入 Gitea (http://gitea.local:3001)
 2. 前往 **User Settings** > **Applications**
 3. 在 **Generate New Token** 區域：
    - Token Name: `argocd`
@@ -79,8 +79,8 @@ argocd repo add http://gitea.local:3000/your-org/gitops-manifests.git \
 2. 部署 Application：
 
 ```bash
-kubectl config use-context kind-argocd-cluster
-kubectl apply -f application-example.yaml
+./kubectl config use-context kind-argocd-cluster
+./kubectl apply -f application-example.yaml
 ```
 
 3. 在 ArgoCD UI 中查看同步狀態
@@ -89,7 +89,7 @@ kubectl apply -f application-example.yaml
 
 ```bash
 argocd app create my-application \
-  --repo http://gitea.local:3000/your-org/gitops-manifests.git \
+  --repo http://gitea.local:3001/your-org/gitops-manifests.git \
   --path overlays/dev \
   --dest-server https://kubernetes.default.svc \
   --dest-namespace app-dev \
@@ -173,11 +173,11 @@ argocd app rollback my-application <version-id>
 
 ```bash
 # 取得 App Cluster 的 kubeconfig
-kubectl config use-context kind-app-cluster
-kubectl config view --minify --flatten > /tmp/app-cluster-kubeconfig
+./kubectl config use-context kind-app-cluster
+./kubectl config view --minify --flatten > /tmp/app-cluster-kubeconfig
 
 # 切換到 ArgoCD cluster
-kubectl config use-context kind-argocd-cluster
+./kubectl config use-context kind-argocd-cluster
 
 # 註冊 App Cluster（透過 ArgoCD CLI）
 argocd cluster add kind-app-cluster \
@@ -205,7 +205,7 @@ destination:
 argocd app get my-application
 
 # 查看 logs
-kubectl logs -n argocd deployment/argocd-application-controller
+./kubectl logs -n argocd deployment/argocd-application-controller
 ```
 
 ### Repository 連線失敗

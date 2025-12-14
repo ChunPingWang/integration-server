@@ -60,7 +60,7 @@ cd ..
 sudo docker ps | grep gitea
 ```
 
-等待 10 秒後訪問: http://gitea.local:3000
+等待 10 秒後訪問: http://gitea.local:3001
 
 ## 4. 部署 Docker Registry
 
@@ -149,7 +149,7 @@ curl http://localhost:5000/v2/_catalog
 
 所有服務已部署完成。現在可以：
 
-1. 訪問 http://gitea.local:3000 完成 Gitea 初始設定
+1. 訪問 http://gitea.local:3001 完成 Gitea 初始設定
 2. 建立 Organization 和 Repositories
 3. 設定 Gitea Actions Runner（參考 gitea-runner/README.md）
 4. 配置 ArgoCD 連接到 Gitea（參考 argocd/README.md）

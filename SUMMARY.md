@@ -5,7 +5,7 @@
 ### ✅ 已完成
 
 #### 配置文件創建
-- [x] 三個 Kind Cluster 配置（ArgoCD、Git、App）
+- [x] 四個 Kind Cluster 配置（ArgoCD、Git、App、Backstage）
 - [x] Gitea Docker Compose 配置
 - [x] Gitea Runner Docker Compose 配置
 - [x] Docker Registry Kubernetes manifests
@@ -34,7 +34,7 @@
    或手動執行 `create-clusters-sudo.sh`
 
 2. **完成 Gitea 初始設定**
-   - 訪問 http://gitea.local:3000
+   - 訪問 http://gitea.local:3001
    - 建立管理員帳號
    - 建立 Organization 和 Repositories
 
@@ -54,27 +54,37 @@
 
 ## 專案架構
 
-### 三層架構設計
+### 四層架構設計
 
 ```
 ┌─────────────────────────────────────────┐
 │    ArgoCD Cluster (kind-argocd-cluster)  │
 │    - ArgoCD (GitOps CD)                  │
-│    - Port: 8443 (HTTPS)                  │
+│    - Port: 8443 (需 port-forward)        │
 └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐
 │    Git Cluster (kind-git-cluster)        │
-│    - Gitea (Docker Container)            │
-│    - Port: 3000 (HTTP), 2222 (SSH)       │
+│    - 保留供未來擴展                       │
 └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐
 │    App Cluster (kind-app-cluster)        │
-│    - Docker Registry (NodePort 30000)    │
-│    - Registry UI (NodePort 30001)        │
+│    - Docker Registry (Port: 5000)        │
+│    - Registry UI (Port: 8081)            │
 │    - Applications (由 ArgoCD 部署)       │
-│    - 1 Control-plane + 2 Workers         │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  Backstage Cluster (kind-backstage)      │
+│    - Backstage Developer Portal          │
+│    - PostgreSQL                          │
+│    - Port: 7007 (HTTP)                   │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│    Gitea (Docker Container)              │
+│    - Port: 3001 (HTTP), 2223 (SSH)       │
 └─────────────────────────────────────────┘
 ```
 
@@ -169,7 +179,7 @@ cicd/ (專案根目錄)
 3. 配置 Runner 並測試 workflow
 
 ### 進階配置（可選）
-1. 整合 Backstage Developer Portal
+1. 配置 Ingress Controller 支援遠端訪問
 2. 配置 Metrics Server 和 Monitoring
 3. 設定 HTTPS 和認證
 4. 配置備份自動化

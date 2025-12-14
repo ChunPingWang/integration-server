@@ -61,7 +61,7 @@ sudo ./execute-deployment.sh
 
 [5/8] 部署 Gitea...
 ✅ Gitea 部署完成
-   訪問: http://gitea.local:3000
+   訪問: http://gitea.local:3001
 
 [6/8] 部署 Docker Registry...
 ✅ Registry 部署完成
@@ -87,7 +87,7 @@ ArgoCD 管理員帳號:
 
 部署完成後，您可以：
 
-1. **訪問 Gitea**: http://gitea.local:3000
+1. **訪問 Gitea**: http://gitea.local:3001
    - 完成初始設定
    - 建立管理員帳號
 
