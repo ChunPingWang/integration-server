@@ -1,0 +1,5 @@
+# Credentials file - DO NOT COMMIT
+CREDENTIALS.md
+
+# Runner secrets
+gitea-runner/.env

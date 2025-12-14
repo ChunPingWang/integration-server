@@ -10,13 +10,14 @@ services:
       - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN}
       - GITEA_RUNNER_NAME=docker-runner
       - GITEA_RUNNER_LABELS=ubuntu-latest:docker://node:20-bookworm,ubuntu-22.04:docker://ubuntu:22.04
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - runner-data:/data
+      - ./config.yaml:/config.yaml
     networks:
       - gitea-network
-    depends_on:
-      - gitea
+    command: daemon --config /config.yaml
 
 networks:
   gitea-network:
