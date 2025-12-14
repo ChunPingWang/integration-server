@@ -19,15 +19,36 @@ echo "  CI/CD Integration Server 自動部署  "
 echo "======================================"
 echo ""
 
-# 步驟 0: 配置 inotify 限制（避免 Kind 節點崩潰）
-echo -e "${BLUE}[0/9]${NC} 配置 inotify 限制..."
+# 步驟 0: 配置系統設定（inotify 限制、Docker 自動啟動）
+echo -e "${BLUE}[0/9]${NC} 配置系統設定..."
+
+# 配置 inotify 限制（避免 Kind 節點崩潰）
 CURRENT_WATCHES=$(cat /proc/sys/fs/inotify/max_user_watches)
 if [ "$CURRENT_WATCHES" -lt 524288 ]; then
     sysctl fs.inotify.max_user_watches=524288
     sysctl fs.inotify.max_user_instances=512
-    echo -e "${GREEN}✅ inotify 限制已增加${NC}"
+    # 永久生效
+    if ! grep -q "fs.inotify.max_user_watches" /etc/sysctl.conf; then
+        echo "fs.inotify.max_user_watches=524288" >> /etc/sysctl.conf
+        echo "fs.inotify.max_user_instances=512" >> /etc/sysctl.conf
+    fi
+    echo -e "${GREEN}✅ inotify 限制已增加並永久生效${NC}"
 else
     echo -e "${YELLOW}⚠️  inotify 限制已足夠${NC}"
+fi
+
+# 啟用 Docker 開機自動啟動
+if ! systemctl is-enabled docker &>/dev/null; then
+    systemctl enable docker
+    echo -e "${GREEN}✅ Docker 開機自動啟動已啟用${NC}"
+else
+    echo -e "${YELLOW}⚠️  Docker 開機自動啟動已啟用${NC}"
+fi
+
+# 確保 Docker 正在運行
+if ! systemctl is-active docker &>/dev/null; then
+    systemctl start docker
+    echo -e "${GREEN}✅ Docker 服務已啟動${NC}"
 fi
 echo ""
 
@@ -180,12 +201,23 @@ echo -e "  ✓ Docker Registry - http://localhost:5000"
 echo -e "  ✓ Registry UI - http://localhost:8081"
 echo -e "  ✓ ArgoCD - https://localhost:8443 (需要 port-forward)"
 echo ""
+echo -e "${BLUE}開機自動啟動配置:${NC}"
+echo -e "  ✓ Docker - systemctl enabled"
+echo -e "  ✓ Gitea - restart: always"
+echo -e "  ✓ Gitea Runner - restart: always (需先手動啟動一次)"
+echo -e "  ✓ Kind Clusters - Docker 自動重啟"
+echo -e "  ✓ inotify 限制 - 已永久寫入 /etc/sysctl.conf"
+echo ""
 echo -e "${YELLOW}檢查狀態:${NC}"
 echo -e "${BLUE}  sudo kind get clusters${NC}"
 echo -e "${BLUE}  sudo docker ps | grep gitea${NC}"
 echo -e "${BLUE}  ./kubectl get pods -A --context kind-app-cluster${NC}"
 echo -e "${BLUE}  ./kubectl get pods -A --context kind-argocd-cluster${NC}"
 echo ""
-echo -e "${GREEN}下一步：訪問 http://gitea.local:3001 完成 Gitea 初始設定${NC}"
+echo -e "${GREEN}下一步：${NC}"
+echo -e "  1. 訪問 http://gitea.local:3001 完成 Gitea 初始設定"
+echo -e "  2. 設定 Gitea Runner (參考 gitea-runner/README.md)"
+echo -e "  3. 重開機後所有服務會自動啟動"
+echo ""
 echo -e "${YELLOW}注意：CI 建置前請先配置 Docker insecure-registries（見 README.md）${NC}"
 echo ""

@@ -18,8 +18,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 步驟 0: 配置 /etc/hosts
-echo -e "${BLUE}[步驟 0]${NC} 配置 /etc/hosts..."
+# 步驟 0: 配置系統設定
+echo -e "${BLUE}[步驟 0]${NC} 配置系統設定..."
+
+# 配置 /etc/hosts
 if ! grep -q "gitea.local" /etc/hosts; then
     echo "需要 sudo 權限來配置 /etc/hosts"
     sudo bash -c 'cat >> /etc/hosts << EOF
@@ -32,6 +34,30 @@ EOF'
     echo -e "${GREEN}✅ /etc/hosts 配置完成${NC}"
 else
     echo -e "${YELLOW}⚠️  /etc/hosts 已包含相關配置${NC}"
+fi
+
+# 啟用 Docker 開機自動啟動
+if ! systemctl is-enabled docker &>/dev/null; then
+    echo "需要 sudo 權限來啟用 Docker 開機自動啟動"
+    sudo systemctl enable docker
+    echo -e "${GREEN}✅ Docker 開機自動啟動已啟用${NC}"
+else
+    echo -e "${YELLOW}⚠️  Docker 開機自動啟動已啟用${NC}"
+fi
+
+# 配置 inotify 限制（永久生效）
+CURRENT_WATCHES=$(cat /proc/sys/fs/inotify/max_user_watches)
+if [ "$CURRENT_WATCHES" -lt 524288 ]; then
+    echo "需要 sudo 權限來配置 inotify 限制"
+    sudo sysctl fs.inotify.max_user_watches=524288
+    sudo sysctl fs.inotify.max_user_instances=512
+    if ! grep -q "fs.inotify.max_user_watches" /etc/sysctl.conf; then
+        echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf > /dev/null
+        echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf > /dev/null
+    fi
+    echo -e "${GREEN}✅ inotify 限制已增加並永久生效${NC}"
+else
+    echo -e "${YELLOW}⚠️  inotify 限制已足夠${NC}"
 fi
 echo ""
 
@@ -229,12 +255,20 @@ echo -e "  ✓ Registry UI - http://localhost:8081"
 echo -e "  ✓ ArgoCD - https://localhost:8443 (需要 port-forward)"
 echo -e "  ✓ Backstage - http://localhost:7007"
 echo ""
+echo -e "${BLUE}開機自動啟動配置:${NC}"
+echo -e "  ✓ Docker - systemctl enabled"
+echo -e "  ✓ Gitea - restart: always"
+echo -e "  ✓ Gitea Runner - restart: always (需先手動啟動一次)"
+echo -e "  ✓ Kind Clusters - Docker 自動重啟"
+echo -e "  ✓ inotify 限制 - 已永久寫入 /etc/sysctl.conf"
+echo ""
 echo -e "${YELLOW}下一步:${NC}"
 echo -e "  1. 訪問 http://gitea.local:3001 完成 Gitea 初始設定"
 echo -e "  2. 在 Gitea 創建 Organization 和 Repositories"
 echo -e "  3. 設定 Gitea Actions Runner (參考 gitea-runner/README.md)"
 echo -e "  4. 配置 ArgoCD 連接到 Gitea repositories"
 echo -e "  5. 訪問 http://localhost:7007 使用 Backstage 開發者入口"
+echo -e "  6. 重開機後所有服務會自動啟動"
 echo ""
 echo -e "${BLUE}檢查狀態:${NC}"
 echo -e "  ./kubectl get pods -A                  # 查看所有 pods"
