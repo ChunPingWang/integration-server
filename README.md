@@ -76,8 +76,8 @@
 │  │  - Web UI      │    │  - Actions     │                              │
 │  │  - Actions CI  │    │                │                              │
 │  │                │    │                │                              │
-│  │  Port: 3000    │    │                │                              │
-│  │  SSH:  2222    │    │                │                              │
+│  │  Port: 3001    │    │                │                              │
+│  │  SSH:  2223    │    │                │                              │
 │  └────────────────┘    └────────────────┘                              │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -357,7 +357,7 @@ EOF'
 ```bash
 cd gitea
 docker-compose up -d
-# 訪問 http://gitea.local:3000 完成初始設定
+# 訪問 http://gitea.local:3001 完成初始設定
 ```
 
 #### 步驟 5: 部署 Registry
@@ -438,8 +438,8 @@ cicd/
 
 | 服務 | URL | 說明 |
 |------|-----|------|
-| Gitea Web | http://gitea.local:3000 | Git 服務 Web UI |
-| Gitea SSH | ssh://gitea.local:2222 | Git SSH 存取 |
+| Gitea Web | http://gitea.local:3001 | Git 服務 Web UI |
+| Gitea SSH | ssh://gitea.local:2223 | Git SSH 存取 |
 | Registry API | http://localhost:5000 | Docker Registry |
 | Registry UI | http://localhost:8081 | Registry Web 介面 |
 | ArgoCD | https://localhost:8443 | 需先 port-forward |
@@ -464,7 +464,7 @@ echo
 
 ### 訪問 Gitea
 
-1. 開啟 http://gitea.local:3000
+1. 開啟 http://gitea.local:3001
 2. 首次訪問需完成初始設定：
    - 資料庫選擇 SQLite3
    - 設定管理員帳號密碼
@@ -503,7 +503,7 @@ docker-compose up -d
 
 # 2. 在 ArgoCD 新增 Repository
 # Settings > Repositories > Connect Repo
-# URL: http://gitea.local:3000/org/repo.git
+# URL: http://172.18.0.1:3001/org/repo.git  (使用 Docker 網路 IP)
 # Username: your-username
 # Password: your-access-token
 ```
@@ -587,6 +587,41 @@ docker volume prune
 ---
 
 ## 故障排除
+
+### inotify 限制錯誤 (重要)
+
+當 Kind 節點出現 `too many open files` 錯誤時：
+
+```bash
+# 檢查當前限制
+cat /proc/sys/fs/inotify/max_user_watches
+cat /proc/sys/fs/inotify/max_user_instances
+
+# 增加限制（需要 sudo）
+sudo sysctl fs.inotify.max_user_watches=524288
+sudo sysctl fs.inotify.max_user_instances=512
+
+# 永久生效
+echo 'fs.inotify.max_user_watches=524288' | sudo tee -a /etc/sysctl.conf
+echo 'fs.inotify.max_user_instances=512' | sudo tee -a /etc/sysctl.conf
+```
+
+### Docker Insecure Registry 設定 (重要)
+
+若 CI 建置時出現 `http: server gave HTTP response to HTTPS client` 錯誤：
+
+```bash
+# 編輯 Docker daemon 設定
+sudo nano /etc/docker/daemon.json
+
+# 加入以下內容
+{
+  "insecure-registries": ["172.18.0.1:5000", "localhost:5000"]
+}
+
+# 重啟 Docker
+sudo systemctl restart docker
+```
 
 ### Gitea 無法訪問
 

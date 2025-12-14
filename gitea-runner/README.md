@@ -4,12 +4,30 @@
 
 - Gitea 已啟動並完成初始設定
 - 已在 Gitea 建立管理員帳號
+- Docker daemon 已配置 insecure registry（詳見下方說明）
+
+## Docker Insecure Registry 設定
+
+在執行 CI 建置前，需先配置 Docker daemon：
+
+```bash
+# 編輯 Docker daemon 設定
+sudo nano /etc/docker/daemon.json
+
+# 加入以下內容
+{
+  "insecure-registries": ["172.18.0.1:5000", "localhost:5000"]
+}
+
+# 重啟 Docker
+sudo systemctl restart docker
+```
 
 ## 設定步驟
 
 ### 步驟 1: 取得 Runner Registration Token
 
-1. 登入 Gitea (http://gitea.local:3000)
+1. 登入 Gitea (http://gitea.local:3001)
 2. 前往 **Site Administration** (管理員選單)
 3. 點擊左側 **Actions** > **Runners**
 4. 點擊 **Create new Runner** 按鈕
@@ -94,15 +112,59 @@ docker-compose up -d
 
 ## Runner 標籤說明
 
-配置的 Runner Labels：
-- `ubuntu-latest`: 使用 `node:20-bookworm` Docker image
-- `ubuntu-22.04`: 使用 `ubuntu:22.04` Docker image
+配置的 Runner Labels（已優化支援 Docker 建置）：
+- `ubuntu-latest`: 使用 `catthehacker/ubuntu:act-latest` Docker image
+- `ubuntu-22.04`: 使用 `catthehacker/ubuntu:act-22.04` Docker image
+
+這些映像包含 Docker CLI，支援在 CI 中執行 Docker 建置和推送。
 
 可在 workflow 中指定：
 ```yaml
 jobs:
   build:
     runs-on: ubuntu-latest  # 或 ubuntu-22.04
+```
+
+## Docker 建置範例
+
+```yaml
+name: CI Pipeline
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: 172.18.0.1:5000
+  IMAGE_NAME: my-app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y git curl
+
+      - name: Clone repository
+        run: |
+          git clone http://172.18.0.1:3001/org/repo.git repo
+          cd repo && ls -la
+
+      - name: Build Docker image
+        run: |
+          cd repo
+          docker build -t $REGISTRY/$IMAGE_NAME:${GITHUB_SHA::7} .
+          docker tag $REGISTRY/$IMAGE_NAME:${GITHUB_SHA::7} $REGISTRY/$IMAGE_NAME:latest
+
+      - name: Push to Registry
+        run: |
+          docker push $REGISTRY/$IMAGE_NAME:${GITHUB_SHA::7}
+          docker push $REGISTRY/$IMAGE_NAME:latest
+
+      - name: Verify image
+        run: |
+          curl -s http://$REGISTRY/v2/$IMAGE_NAME/tags/list
 ```
 
 ## 進階配置
@@ -112,6 +174,13 @@ jobs:
 ```yaml
 environment:
   - GITEA_RUNNER_LABELS=my-label:docker://my-image:tag
+```
+
+**重要**：修改 labels 後需要刪除 `.runner` 檔案並重新註冊：
+
+```bash
+docker exec gitea-runner rm /data/.runner
+docker compose down && docker compose up -d
 ```
 
 ## 相關連結

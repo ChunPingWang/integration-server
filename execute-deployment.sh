@@ -19,6 +19,18 @@ echo "  CI/CD Integration Server 自動部署  "
 echo "======================================"
 echo ""
 
+# 步驟 0: 配置 inotify 限制（避免 Kind 節點崩潰）
+echo -e "${BLUE}[0/9]${NC} 配置 inotify 限制..."
+CURRENT_WATCHES=$(cat /proc/sys/fs/inotify/max_user_watches)
+if [ "$CURRENT_WATCHES" -lt 524288 ]; then
+    sysctl fs.inotify.max_user_watches=524288
+    sysctl fs.inotify.max_user_instances=512
+    echo -e "${GREEN}✅ inotify 限制已增加${NC}"
+else
+    echo -e "${YELLOW}⚠️  inotify 限制已足夠${NC}"
+fi
+echo ""
+
 # 步驟 1: 配置 /etc/hosts
 echo -e "${BLUE}[1/8]${NC} 配置 /etc/hosts..."
 if grep -q "gitea.local" /etc/hosts; then
@@ -89,7 +101,7 @@ else
     echo "等待 Gitea 啟動..."
     sleep 10
     echo -e "${GREEN}✅ Gitea 部署完成${NC}"
-    echo -e "${GREEN}   訪問: http://gitea.local:3000${NC}"
+    echo -e "${GREEN}   訪問: http://gitea.local:3001${NC}"
 fi
 cd ..
 echo ""
@@ -163,7 +175,7 @@ echo "======================================"
 echo ""
 echo -e "${BLUE}已部署的服務:${NC}"
 echo -e "  ✓ Kind Clusters: $(kind get clusters | wc -l) 個"
-echo -e "  ✓ Gitea - http://gitea.local:3000"
+echo -e "  ✓ Gitea - http://gitea.local:3001"
 echo -e "  ✓ Docker Registry - http://localhost:5000"
 echo -e "  ✓ Registry UI - http://localhost:8081"
 echo -e "  ✓ ArgoCD - https://localhost:8443 (需要 port-forward)"
@@ -174,5 +186,6 @@ echo -e "${BLUE}  sudo docker ps | grep gitea${NC}"
 echo -e "${BLUE}  ./kubectl get pods -A --context kind-app-cluster${NC}"
 echo -e "${BLUE}  ./kubectl get pods -A --context kind-argocd-cluster${NC}"
 echo ""
-echo -e "${GREEN}下一步：訪問 http://gitea.local:3000 完成 Gitea 初始設定${NC}"
+echo -e "${GREEN}下一步：訪問 http://gitea.local:3001 完成 Gitea 初始設定${NC}"
+echo -e "${YELLOW}注意：CI 建置前請先配置 Docker insecure-registries（見 README.md）${NC}"
 echo ""

@@ -1,241 +1,174 @@
-# 🚀 CI/CD Integration Server 部署狀態報告
+# CI/CD Integration Server 部署狀態報告
 
 **日期**: 2025-12-14
-**版本**: v1.0
-**狀態**: ✅ 配置完成，準備部署
+**版本**: v1.1
+**狀態**: 已驗證完成
 
 ---
 
-## 📊 專案統計
+## 測試結果摘要
 
-- **Git 提交**: 8 次（全部使用繁體中文）
-- **配置檔案**: 29 個
-- **文件大小**: 完整 CI/CD 環境配置
-- **架構**: 3 個獨立 Kind Clusters
-
----
-
-## ✅ 已完成工作
-
-### 1. 配置文件創建 ✓
-- [x] Kind Cluster 配置（3 個）
-- [x] Gitea Docker Compose 配置
-- [x] Gitea Runner 配置
-- [x] Docker Registry Kubernetes manifests
-- [x] ArgoCD Application 範例
-- [x] CI/CD Workflow 範例
-- [x] 資料庫 Migration 腳本
-
-### 2. 自動化腳本 ✓
-- [x] Docker 權限設置腳本
-- [x] Cluster 創建腳本（2 個版本）
-- [x] 一鍵部署腳本
-- [x] 分步部署腳本
-- [x] 資料庫測試腳本
-
-### 3. 文件撰寫 ✓
-- [x] README.md（完整指南）
-- [x] SUMMARY.md（專案總結）
-- [x] DEPLOY-COMMANDS.md（部署命令）
-- [x] Gitea Runner 設定指南
-- [x] ArgoCD 使用指南
-- [x] 詳細任務清單
-
-### 4. 工具準備 ✓
-- [x] kubectl 下載與配置
-- [x] /etc/hosts 配置模板
-- [x] Git repository 初始化
+| 測試項目 | 狀態 | 說明 |
+|---------|------|------|
+| Kind Clusters 建立 | 通過 | 3 個 clusters 正常運行 |
+| Gitea 服務 | 通過 | http://gitea.local:3001 |
+| Docker Registry | 通過 | http://localhost:5000 |
+| ArgoCD 部署 | 通過 | https://localhost:8443 |
+| Gitea Runner CI | 通過 | Docker 建置正常 |
+| GitOps 端到端流程 | 通過 | 完整流程驗證 |
 
 ---
 
-## 📁 專案結構
+## 已驗證的完整 GitOps 流程
 
 ```
-cicd/ (29 個檔案)
-├── 配置文件 (8 個)
-│   ├── kind-argocd-cluster.yaml
-│   ├── kind-git-cluster.yaml
-│   ├── kind-app-cluster.yaml
-│   ├── gitea/docker-compose.yaml
-│   ├── gitea-runner/docker-compose.yaml
-│   └── registry/*.yaml (3 個)
-│
-├── 腳本 (6 個)
-│   ├── deploy-all.sh
-│   ├── deploy-step-by-step.sh
-│   ├── create-clusters.sh
-│   ├── create-clusters-sudo.sh
-│   ├── setup-docker-permissions.sh
-│   └── db/scripts/test-connection.sh
-│
-├── 文件 (7 個)
-│   ├── README.md
-│   ├── SUMMARY.md
-│   ├── DEPLOY-COMMANDS.md
-│   ├── DEPLOYMENT-STATUS.md
-│   ├── gitea-runner/README.md
-│   ├── argocd/README.md
-│   └── tasks-gitea.md
-│
-├── 範例 (2 個)
-│   ├── workflows/ci-example.yaml
-│   └── workflows/integration-test-example.yaml
-│
-├── 資料庫 (4 個)
-│   └── db/migration/*.sql (3 個 + 1 個腳本)
-│
-└── 工具 (2 個)
-    ├── kubectl
-    └── hosts-config.txt
+Git Push → Gitea Actions → Docker Build → Registry Push → Manifest Update → ArgoCD Sync → App Deployed
 ```
+
+### 測試結果詳情
+
+| 步驟 | 組件 | 狀態 | 詳情 |
+|------|------|------|------|
+| 1 | Git Push | 通過 | 程式碼推送至 Gitea |
+| 2 | Gitea Actions | 通過 | CI Pipeline 自動觸發 |
+| 3 | Docker Build | 通過 | 使用 catthehacker/ubuntu:act-latest 映像 |
+| 4 | Registry Push | 通過 | 映像推送至 172.18.0.1:5000 |
+| 5 | Manifest Update | 通過 | k8s 清單自動更新映像標籤 |
+| 6 | ArgoCD Sync | 通過 | 自動同步至 app-cluster |
+| 7 | Pod Rollout | 通過 | 新版本 Pod 正常運行 |
 
 ---
 
-## 🎯 下一步：開始部署
+## 服務訪問資訊
 
-### 方法 1: 使用詳細命令清單（推薦）
+| 服務 | URL | 帳號 |
+|------|-----|------|
+| Gitea | http://gitea.local:3001 | admin / Admin@123 |
+| ArgoCD | https://localhost:8443 | admin / (見 CREDENTIALS.md) |
+| Registry | http://localhost:5000 | 無需認證 |
+| Registry UI | http://localhost:8081 | 無需認證 |
 
-**開啟並按照執行**: [DEPLOY-COMMANDS.md](DEPLOY-COMMANDS.md)
-
-這個文件包含所有需要手動執行的命令，並附有驗證步驟。
-
-### 方法 2: 使用互動式腳本
+### ArgoCD Port Forward 指令
 
 ```bash
-./deploy-step-by-step.sh
-```
-
-這個腳本會引導您逐步執行每個部署步驟。
-
----
-
-## 📋 部署檢查清單
-
-### 階段 1: 環境準備
-- [ ] 配置 /etc/hosts
-- [ ] 驗證 Docker 運行
-- [ ] 驗證 Kind 安裝
-
-### 階段 2: Clusters 創建
-- [ ] 創建 ArgoCD Cluster
-- [ ] 創建 Git Cluster
-- [ ] 創建 App Cluster
-- [ ] 修復 kubeconfig 權限
-- [ ] 驗證所有 clusters 正常
-
-### 階段 3: 服務部署
-- [ ] 部署 Gitea
-- [ ] 部署 Docker Registry
-- [ ] 部署 Registry UI
-- [ ] 部署 ArgoCD
-- [ ] 下載 Oracle Image（可選）
-
-### 階段 4: 服務驗證
-- [ ] 訪問 Gitea (http://gitea.local:3000)
-- [ ] 訪問 Registry UI (http://localhost:8081)
-- [ ] 訪問 ArgoCD (https://localhost:8443)
-- [ ] 驗證 Registry API
-- [ ] 驗證所有 Pods 運行正常
-
-### 階段 5: 初始配置
-- [ ] 完成 Gitea 初始設定
-- [ ] 建立 Organization
-- [ ] 建立 Repositories
-- [ ] 設定 Gitea Runner
-- [ ] 配置 ArgoCD Repository
-
-### 階段 6: 測試
-- [ ] 測試 Gitea Actions
-- [ ] 測試 ArgoCD 同步
-- [ ] 執行端到端 CI/CD 流程
-
----
-
-## 🔧 快速命令參考
-
-### 檢查狀態
-```bash
-# Clusters
-sudo kind get clusters
-
-# Gitea
-sudo docker ps | grep gitea
-
-# Registry
-curl http://localhost:5000/v2/_catalog
-
-# Pods
-./kubectl get pods -A --context kind-app-cluster
-./kubectl get pods -A --context kind-argocd-cluster
-```
-
-### 訪問服務
-```bash
-# Gitea
-open http://gitea.local:3000
-
-# Registry UI
-open http://localhost:8081
-
-# ArgoCD (需先 port-forward)
+./kubectl config use-context kind-argocd-cluster
 ./kubectl port-forward svc/argocd-server -n argocd 8443:443
-open https://localhost:8443
-```
-
-### 取得 ArgoCD 密碼
-```bash
-./kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-echo
 ```
 
 ---
 
-## 📚 文件連結
+## 部署過程中解決的問題
 
-- 📖 [主要使用指南](README.md)
-- 📝 [詳細任務清單](tasks-gitea.md)
-- 🚀 [部署命令清單](DEPLOY-COMMANDS.md)
-- 📊 [專案總結](SUMMARY.md)
-- 🏃 [Gitea Runner 設定](gitea-runner/README.md)
-- 🔄 [ArgoCD 使用指南](argocd/README.md)
+### 1. Port 衝突問題
+
+**問題**: app-cluster 與 git-cluster 的 port 衝突
+
+**解決方案**:
+- Gitea: 3000 → 3001, 2222 → 2223
+- app-cluster: 80 → 8088, 443 → 8448
+
+### 2. inotify 限制錯誤
+
+**問題**: Kind 節點出現 `too many open files` 錯誤
+
+**解決方案**:
+```bash
+sudo sysctl fs.inotify.max_user_watches=524288
+sudo sysctl fs.inotify.max_user_instances=512
+```
+
+### 3. Registry PVC Pending
+
+**問題**: local-path-provisioner 無法正常運作
+
+**解決方案**: 將 Registry 部署改為使用 emptyDir
+
+### 4. CI 建置 Docker 失敗
+
+**問題**:
+- `docker: command not found`
+- `http: server gave HTTP response to HTTPS client`
+
+**解決方案**:
+1. 更新 Runner labels 使用 `catthehacker/ubuntu:act-latest` 映像
+2. 配置 Docker daemon insecure-registries
+3. 刪除 `.runner` 檔案重新註冊 Runner
+
+### 5. ArgoCD 無法連接 app-cluster
+
+**問題**: app-cluster 未在 ArgoCD 註冊
+
+**解決方案**: 建立 ServiceAccount 並配置 cluster secret
+
+### 6. app-cluster 無法拉取 Registry 映像
+
+**問題**: containerd 未配置 insecure registry
+
+**解決方案**:
+```bash
+docker exec app-cluster-control-plane bash -c 'cat >> /etc/containerd/config.toml << EOF
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."172.18.0.1:5000"]
+  endpoint = ["http://172.18.0.1:5000"]
+EOF'
+docker exec app-cluster-control-plane systemctl restart containerd
+```
 
 ---
 
-## 💡 技術支援
+## Kubernetes Clusters 狀態
 
-### Git 歷史查看
-```bash
-git log --oneline --all --graph
-```
+| Cluster | Context | 用途 |
+|---------|---------|------|
+| argocd-cluster | kind-argocd-cluster | ArgoCD GitOps CD |
+| git-cluster | kind-git-cluster | 保留擴展用 |
+| app-cluster | kind-app-cluster | 應用程式部署 |
 
-### 查看特定提交
-```bash
-git show <commit-hash>
-```
+### 檢查指令
 
-### 回滾到特定版本（如果需要）
 ```bash
-git checkout <commit-hash> -- <file>
+# 列出所有 clusters
+kind get clusters
+
+# 檢查特定 cluster
+./kubectl get pods -A --context kind-argocd-cluster
+./kubectl get pods -A --context kind-app-cluster
+
+# 檢查 ArgoCD Applications
+./kubectl get applications -n argocd --context kind-argocd-cluster
 ```
 
 ---
 
-## 🎉 預期結果
+## Registry 映像清單
 
-部署完成後，您將擁有：
+```bash
+# 查看所有映像
+curl -s http://localhost:5000/v2/_catalog
 
-✅ 完整的 GitOps CI/CD 環境
-✅ 輕量級 Git 服務（Gitea）
-✅ 自動化 CI Pipeline（Gitea Actions）
-✅ 自動化 CD（ArgoCD）
-✅ 私有 Docker Registry
-✅ Oracle XE 整合測試環境
-✅ 完整的文件與指南
-
-**總記憶體使用**: ~45GB（比 GitLab 方案節省 11GB）
+# 查看特定映像標籤
+curl -s http://localhost:5000/v2/test-app/tags/list
+curl -s http://localhost:5000/v2/oracle-xe/tags/list
+```
 
 ---
 
-**準備好了嗎？開始部署吧！** 🚀
+## 下次部署注意事項
 
-請開啟 [DEPLOY-COMMANDS.md](DEPLOY-COMMANDS.md) 並按照步驟執行。
+1. **先執行 inotify 設定** - 避免 Kind 節點崩潰
+2. **配置 Docker insecure-registries** - CI 建置需要
+3. **使用正確的 ports** - Gitea: 3001/2223
+4. **Runner 重新註冊** - 修改 labels 後需要
+
+---
+
+## 文件連結
+
+- [主要使用指南](README.md)
+- [Gitea Runner 設定](gitea-runner/README.md)
+- [ArgoCD 使用指南](argocd/README.md)
+- [認證資訊](CREDENTIALS.md) (已加入 .gitignore)
+
+---
+
+**最後更新**: 2025-12-14
+**測試人員**: Claude Code
