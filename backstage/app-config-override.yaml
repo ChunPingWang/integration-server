@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-app-config
+  namespace: backstage
+data:
+  app-config.production.yaml: |
+    backend:
+      reading:
+        allow:
+          - host: raw.githubusercontent.com
+          - host: github.com
+          - host: '*.github.com'
+          - host: '*.githubusercontent.com'
+
+    catalog:
+      rules:
+        - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
+      locations:
+        - type: url
+          target: https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]

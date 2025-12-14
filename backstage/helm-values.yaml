@@ -20,6 +20,12 @@ backstage:
       value: "CI/CD Integration Server - Backstage"
     - name: APP_CONFIG_organization_name
       value: "CI/CD Team"
+    - name: APP_CONFIG_auth_environment
+      value: "development"
+    - name: APP_CONFIG_auth_providers_guest_dangerouslyAllowOutsideDevelopment
+      value: "true"
+    - name: NODE_ENV
+      value: "development"
 
   resources:
     requests:
@@ -47,6 +53,12 @@ backstage:
         origin: http://localhost:7007
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
+      reading:
+        allow:
+          - host: raw.githubusercontent.com
+          - host: github.com
+          - host: '*.github.com'
+          - host: '*.githubusercontent.com'
 
     auth:
       environment: development
