@@ -380,9 +380,12 @@ cd /path/to/cicd
 
 部署腳本會自動：
 1. 配置 `/etc/hosts`
-2. 創建三個 Kind clusters
-3. 部署 Gitea、Registry、ArgoCD
-4. 下載並推送 Oracle image
+2. **啟用 Docker 開機自動啟動** (`systemctl enable docker`)
+3. **配置 inotify 限制** (永久寫入 `/etc/sysctl.conf`)
+4. 創建四個 Kind clusters
+5. 部署 Gitea、Registry、ArgoCD、Backstage
+6. 下載並推送 Oracle image
+7. **重開機後所有服務自動啟動**
 
 ### 手動分步部署
 
@@ -1109,17 +1112,20 @@ docker volume prune
 
 本專案的所有服務都已配置為開機自動啟動，無需手動操作。
 
+> **注意**：執行 `deploy-all.sh` 或 `execute-deployment.sh` 時會自動配置所有自動啟動設定。
+
 #### 自動啟動配置
 
-| 組件 | 自動啟動方式 | 配置位置 |
-|------|-------------|----------|
-| Docker | systemd enabled | 系統服務 |
-| Gitea | `restart: always` | `gitea/docker-compose.yaml` |
-| Gitea Runner | `restart: always` | `gitea-runner/docker-compose.yaml` |
-| Kind Clusters | Docker 自動重啟 | Docker 容器 |
-| Registry | Kubernetes Deployment | kind-app-cluster |
-| ArgoCD | Kubernetes Deployment | kind-argocd-cluster |
-| Backstage | Kubernetes Deployment | kind-backstage-cluster |
+| 組件 | 自動啟動方式 | 配置位置 | 由腳本自動設定 |
+|------|-------------|----------|---------------|
+| Docker | systemd enabled | 系統服務 | ✅ 是 |
+| inotify 限制 | /etc/sysctl.conf | 系統設定 | ✅ 是 |
+| Gitea | `restart: always` | `gitea/docker-compose.yaml` | ✅ 已內建 |
+| Gitea Runner | `restart: always` | `gitea-runner/docker-compose.yaml` | ✅ 已內建 |
+| Kind Clusters | Docker 自動重啟 | Docker 容器 | ✅ 自動 |
+| Registry | Kubernetes Deployment | kind-app-cluster | ✅ 自動 |
+| ArgoCD | Kubernetes Deployment | kind-argocd-cluster | ✅ 自動 |
+| Backstage | Kubernetes Deployment | kind-backstage-cluster | ✅ 自動 |
 
 #### 啟動流程
 
@@ -1364,4 +1370,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.5 (新增開機自動啟動說明)
+**版本**：v1.6 (部署腳本自動配置開機啟動)
