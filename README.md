@@ -6,6 +6,7 @@
 
 ## 目錄
 
+- [系統現況](#系統現況)
 - [專案簡介](#專案簡介)
 - [系統架構](#系統架構)
 - [核心概念](#核心概念)
@@ -19,6 +20,65 @@
 - [維護指南](#維護指南)
 - [故障排除](#故障排除)
 - [學習資源](#學習資源)
+
+---
+
+## 系統現況
+
+> 📅 最後更新：2025-12-14
+
+### 服務狀態
+
+| 服務 | 狀態 | URL | 說明 |
+|------|------|-----|------|
+| Gitea | ✅ 運行中 | http://gitea.local:3001 | v1.25.2 |
+| Docker Registry | ✅ 運行中 | http://localhost:5000 | 含 Registry UI (8081) |
+| ArgoCD | ✅ 運行中 | https://localhost:8443 | 需 port-forward |
+| Backstage | ✅ 運行中 | http://localhost:7007 | 開發者入口平台 |
+
+### Kubernetes Clusters
+
+| Cluster | Context | 用途 | 狀態 |
+|---------|---------|------|------|
+| argocd-cluster | kind-argocd-cluster | ArgoCD GitOps | ✅ 運行中 |
+| git-cluster | kind-git-cluster | 保留擴展 | ✅ 運行中 |
+| app-cluster | kind-app-cluster | Registry + Apps | ✅ 運行中 |
+| backstage-cluster | kind-backstage-cluster | Backstage Portal | ✅ 運行中 |
+
+### Backstage Catalog 統計
+
+| 實體類型 | 數量 | 內容 |
+|----------|------|------|
+| Domain | 1 | cicd-infrastructure |
+| System | 1 | cicd-integration-server |
+| Component | 5 | Gitea, Runner, ArgoCD, Registry, Backstage |
+| API | 2 | Gitea REST API, Docker Registry API |
+| Resource | 6 | 4 Clusters + PostgreSQL + Oracle Image |
+| Group | 1 | cicd-team |
+| User | 1 | admin |
+| **總計** | **19** | |
+
+### Registry 映像
+
+```bash
+# 目前已儲存的映像
+curl http://localhost:5000/v2/_catalog
+# {"repositories":["oracle-xe","test-app"]}
+```
+
+### 快速驗證命令
+
+```bash
+# 檢查所有服務
+./kubectl get pods -A --context kind-argocd-cluster
+./kubectl get pods -A --context kind-app-cluster
+./kubectl get pods -A --context kind-backstage-cluster
+docker ps | grep gitea
+
+# 檢查 Backstage Catalog
+curl -s http://localhost:7007/api/catalog/entities | jq 'length'
+# 預期: 19
+```
 
 ---
 
@@ -1210,4 +1270,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.3 (增強 Backstage 配置說明)
+**版本**：v1.4 (新增系統現況狀態)
