@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  gitea-runner:
+    image: gitea/act_runner:latest
+    container_name: gitea-runner
+    restart: always
+    environment:
+      - GITEA_INSTANCE_URL=http://gitea:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${RUNNER_TOKEN}
+      - GITEA_RUNNER_NAME=docker-runner
+      - GITEA_RUNNER_LABELS=ubuntu-latest:docker://node:20-bookworm,ubuntu-22.04:docker://ubuntu:22.04
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner-data:/data
+    networks:
+      - gitea-network
+    depends_on:
+      - gitea
+
+networks:
+  gitea-network:
+    external: true
+
+volumes:
+  runner-data:
+    name: gitea-runner-data
