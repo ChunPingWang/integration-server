@@ -1105,6 +1105,100 @@ docker volume prune
 | 每月 | 清理未使用 images | `docker system prune` |
 | 每季 | 更新組件版本 | 修改各 docker-compose.yaml |
 
+### 開機自動啟動
+
+本專案的所有服務都已配置為開機自動啟動，無需手動操作。
+
+#### 自動啟動配置
+
+| 組件 | 自動啟動方式 | 配置位置 |
+|------|-------------|----------|
+| Docker | systemd enabled | 系統服務 |
+| Gitea | `restart: always` | `gitea/docker-compose.yaml` |
+| Gitea Runner | `restart: always` | `gitea-runner/docker-compose.yaml` |
+| Kind Clusters | Docker 自動重啟 | Docker 容器 |
+| Registry | Kubernetes Deployment | kind-app-cluster |
+| ArgoCD | Kubernetes Deployment | kind-argocd-cluster |
+| Backstage | Kubernetes Deployment | kind-backstage-cluster |
+
+#### 啟動流程
+
+```
+電腦開機
+    │
+    ▼
+Docker 服務啟動 (systemd)
+    │
+    ├──► Kind Cluster 容器自動啟動
+    │       ├── argocd-cluster
+    │       ├── git-cluster
+    │       ├── app-cluster (Registry)
+    │       └── backstage-cluster
+    │
+    ├──► Gitea 容器自動啟動 (restart: always)
+    │
+    └──► Gitea Runner 容器自動啟動 (restart: always)
+```
+
+#### 開機後驗證 (約等待 1-2 分鐘)
+
+```bash
+# 快速驗證所有服務
+curl -s http://gitea.local:3001/api/v1/version && echo " ✓ Gitea OK"
+curl -s http://localhost:5000/v2/_catalog && echo " ✓ Registry OK"
+curl -s http://localhost:7007/.backstage/health/v1/readiness && echo " ✓ Backstage OK"
+
+# 檢查 Kubernetes Pods
+./kubectl get pods -A --context kind-argocd-cluster | grep -v Completed
+./kubectl get pods -A --context kind-app-cluster | grep -v Completed
+./kubectl get pods -A --context kind-backstage-cluster | grep -v Completed
+```
+
+### 關機與重啟
+
+#### 正常關機
+
+直接關機即可，所有服務會自動停止，資料會保存在：
+
+| 資料類型 | 儲存位置 | 說明 |
+|----------|----------|------|
+| Gitea 資料 | Docker Volume `gitea-data` | Git repos, 設定, 資料庫 |
+| Runner 資料 | Docker Volume `gitea-runner-data` | Runner 註冊資訊 |
+| Registry 資料 | Kubernetes PVC | Docker images |
+| Backstage 資料 | Kubernetes PVC | PostgreSQL 資料庫 |
+
+#### 優雅關機 (可選)
+
+如需確保資料完整性，可依序停止服務：
+
+```bash
+# 1. 停止 Gitea Runner
+cd /home/rexwang/workspace/cicd/gitea-runner && docker-compose down
+
+# 2. 停止 Gitea
+cd /home/rexwang/workspace/cicd/gitea && docker-compose down
+
+# 3. Kind clusters 會隨 Docker 自動停止
+```
+
+#### 手動啟動 (如自動啟動失敗)
+
+```bash
+cd /home/rexwang/workspace/cicd
+
+# 確認 Docker 運行中
+sudo systemctl start docker
+
+# 啟動 Gitea
+cd gitea && docker-compose up -d && cd ..
+
+# 啟動 Gitea Runner
+cd gitea-runner && docker-compose up -d && cd ..
+
+# Kind clusters 應該已自動啟動，若未啟動則執行：
+# kind get clusters  # 檢查現有 clusters
+```
+
 ---
 
 ## 故障排除
@@ -1270,4 +1364,4 @@ docker-compose up -d
 
 **建立日期**：2025-12-14
 **最後更新**：2025-12-14
-**版本**：v1.4 (新增系統現況狀態)
+**版本**：v1.5 (新增開機自動啟動說明)
