@@ -5,7 +5,23 @@ metadata:
   namespace: backstage
 data:
   app-config.production.yaml: |
+    app:
+      title: CI/CD Integration Server - Backstage
+      baseUrl: http://localhost:7007
+
+    organization:
+      name: CI/CD Team
+
     backend:
+      baseUrl: http://localhost:7007
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: http://localhost:7007
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
       reading:
         allow:
           - host: raw.githubusercontent.com
@@ -13,7 +29,23 @@ data:
           - host: '*.github.com'
           - host: '*.githubusercontent.com'
 
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+
+    techdocs:
+      builder: local
+      generator:
+        runIn: local
+      publisher:
+        type: local
+
     catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
       rules:
         - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
       locations:

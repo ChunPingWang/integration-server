@@ -73,10 +73,11 @@ backstage:
       rules:
         - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
       locations:
+        # CI/CD Integration Server 自訂 Catalog
         - type: url
-          target: https://raw.githubusercontent.com/backstage/backstage/master/packages/catalog-model/examples/all-components.yaml
+          target: https://raw.githubusercontent.com/ChunPingWang/integration-server/main/backstage/catalog-info.yaml
           rules:
-            - allow: [Component]
+            - allow: [Component, System, API, Resource, Location, Group, User, Template, Domain]
 
 service:
   type: NodePort
