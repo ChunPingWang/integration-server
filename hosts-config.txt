@@ -1,0 +1,7 @@
+# Add these lines to /etc/hosts
+# Run: sudo nano /etc/hosts
+# Then paste the following lines at the end:
+
+127.0.0.1  gitea.local
+127.0.0.1  registry.local
+127.0.0.1  argocd.local
