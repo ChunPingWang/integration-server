@@ -1,5 +1,44 @@
-# Credentials file - DO NOT COMMIT
+# 認證與密鑰檔案
 CREDENTIALS.md
-
-# Runner secrets
 gitea-runner/.env
+*.pem
+*.key
+
+# 下載的二進位檔案
+helm
+get_helm.sh
+
+# 暫存檔案
+*.tmp
+*.bak
+*.swp
+*~
+
+# 大型檔案
+*.zip
+*.tar.gz
+*.tar
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# IDE 設定
+.idea/
+.vscode/
+*.iml
+
+# 本地測試資料
+*.log
+tmp/
+temp/
+
+# Gitea 資料目錄 (由 Docker Volume 管理)
+gitea/gitea-data/
+
+# Runner 資料目錄
+gitea-runner/runner-data/
+
+# Token 檔案
+token.txt
+*.token
