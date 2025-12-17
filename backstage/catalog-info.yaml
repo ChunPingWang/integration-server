@@ -738,6 +738,182 @@ spec:
 
 ---
 # ============================================
+# Components - MockGBP Mock Server
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mockgbp-server
+  title: MockGBP - TCS BaNCS Mock Server
+  description: |
+    ## 服務說明
+    基於 MockServer 的 TCS BaNCS API 模擬服務，用於整合測試環境中模擬後端 API 回應。
+
+    ## 存取資訊
+    - **Management API**: http://10.0.0.14:9999
+    - **MockServer API**: http://10.0.0.14:9998
+    - **Swagger UI**: http://10.0.0.14:9999/swagger-ui.html
+    - **OpenAPI Docs**: http://10.0.0.14:9999/v3/api-docs
+
+    ## 功能特色
+    - 自動載入 Swagger 規格並建立 Mock 端點
+    - 智慧回應生成（根據 Schema 產生真實模擬資料）
+    - 自訂回應覆蓋（Expectation 機制）
+    - 請求記錄與查詢
+
+    ## 架構
+    - **六角架構 (Hexagonal Architecture)**
+    - **領域驅動設計 (DDD)**
+    - Spring Boot 3.2.1 + MockServer 5.15.0
+
+    ## 原始碼
+    http://10.0.0.14:3001/cpingwang/cub-mock-gbp
+  annotations:
+    backstage.io/source-location: url:http://10.0.0.14:3001/cpingwang/cub-mock-gbp
+  links:
+    - url: http://10.0.0.14:9999/swagger-ui.html
+      title: Swagger UI
+      icon: docs
+    - url: http://10.0.0.14:9999/actuator/health
+      title: Health Check
+      icon: dashboard
+    - url: http://10.0.0.14:3001/cpingwang/cub-mock-gbp
+      title: Git Repository
+      icon: github
+  tags:
+    - java
+    - spring-boot
+    - mockserver
+    - api-mock
+    - testing
+spec:
+  type: service
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  providesApis:
+    - mockgbp-management-api
+    - mockgbp-mockserver-api
+
+---
+# ============================================
+# APIs - MockGBP
+# ============================================
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: mockgbp-management-api
+  title: MockGBP Management API
+  description: |
+    MockGBP 管理 API，用於管理 Mock 服務。
+
+    ## 主要功能
+    - Swagger 規格管理 (`/api/v1/swagger-specs`)
+    - 端點探索 (`/api/v1/endpoints`)
+    - 自訂回應設定 (`/api/v1/expectations`)
+    - 請求記錄查詢 (`/api/v1/request-logs`)
+
+    ## API 文件
+    - Swagger UI: http://10.0.0.14:9999/swagger-ui.html
+    - OpenAPI JSON: http://10.0.0.14:9999/v3/api-docs
+  links:
+    - url: http://10.0.0.14:9999/swagger-ui.html
+      title: Swagger UI
+      icon: docs
+    - url: http://10.0.0.14:9999/v3/api-docs
+      title: OpenAPI Spec
+      icon: docs
+  tags:
+    - rest
+    - openapi
+    - management
+spec:
+  type: openapi
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  definition:
+    $text: http://10.0.0.14:9999/v3/api-docs
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: mockgbp-mockserver-api
+  title: MockGBP MockServer API
+  description: |
+    MockGBP Mock 服務 API，提供動態模擬的 TCS BaNCS API 端點。
+
+    ## 服務端口
+    Port 9998
+
+    ## 支援的 API 類別
+    - Banking and Trade APIs
+    - Payment APIs
+
+    ## 使用方式
+    ```bash
+    # 呼叫 Mock 端點
+    curl http://10.0.0.14:9998/balance-management/query
+
+    # POST 請求
+    curl -X POST http://10.0.0.14:9998/payments/transfer \
+      -H "Content-Type: application/json" \
+      -d '{"amount": 100}'
+    ```
+
+    ## 自訂回應
+    透過 Management API 設定 Expectation 來覆蓋預設回應。
+  links:
+    - url: http://10.0.0.14:9998
+      title: MockServer Endpoint
+      icon: web
+  tags:
+    - rest
+    - mock
+    - banking
+    - payment
+spec:
+  type: openapi
+  lifecycle: production
+  owner: cicd-team
+  system: cicd-integration-server
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: MockGBP MockServer API
+      description: TCS BaNCS Mock API endpoints
+      version: "1.0"
+    servers:
+      - url: http://10.0.0.14:9998
+    paths:
+      /balance-management/query:
+        get:
+          summary: Query balance
+          responses:
+            '200':
+              description: Balance info
+      /balance-management/rule:
+        put:
+          summary: Update balance rule
+          responses:
+            '200':
+              description: Success
+      /payments-parameters/subscription:
+        put:
+          summary: Update subscription
+          responses:
+            '200':
+              description: Success
+      /customer-info/search:
+        post:
+          summary: Search customer
+          responses:
+            '200':
+              description: Customer info
+
+---
+# ============================================
 # Location - 用於自動發現其他 catalog 檔案
 # ============================================
 apiVersion: backstage.io/v1alpha1
