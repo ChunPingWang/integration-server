@@ -1,0 +1,41 @@
+# ArgoCD Application - cub-mock-gbp
+# 監控 Gitea 倉庫並自動部署到 mockgbp-cluster
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cub-mock-gbp
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # Source: Gitea Repository
+  source:
+    repoURL: http://172.18.0.1:3001/cpingwang/cub-mock-gbp.git
+    targetRevision: HEAD
+    path: k8s
+
+  # Destination: mockgbp-cluster
+  destination:
+    server: https://172.18.0.6:6443
+    namespace: mockgbp
+
+  # Sync Policy: 自動同步
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - Validate=true
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

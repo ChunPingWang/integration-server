@@ -1,0 +1,30 @@
+# MockGBP Cluster Configuration
+# 專用於運行 cub-mock-gbp 應用的 Kind Cluster
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: mockgbp-cluster
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # MockGBP Management API (Swagger UI)
+      - containerPort: 30999
+        hostPort: 9999
+        protocol: TCP
+      # MockGBP MockServer API
+      - containerPort: 30998
+        hostPort: 9998
+        protocol: TCP
+      # HTTP Ingress
+      - containerPort: 80
+        hostPort: 9080
+        protocol: TCP
+      # HTTPS Ingress
+      - containerPort: 443
+        hostPort: 9443
+        protocol: TCP
